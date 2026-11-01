@@ -115,6 +115,17 @@ class StudentController extends Controller
                 throw ValidationException::withMessages(['subjectIds' => 'Subjects or class sections with existing evaluations cannot be removed or changed for this period.']);
             }
             unset($data['year'], $data['block']);
+            // Keep the authentication identity in sync with the administrator's edit.
+            // The old address must no longer receive password-reset codes.
+            if ($student->user_id) {
+                $user = \App\Models\User::whereKey($student->user_id)->lockForUpdate()->firstOrFail();
+                if ($user->email !== $data['email']) {
+                    DB::table('password_reset_tokens')->whereIn('email', [$user->email, $data['email']])->delete();
+                    $user->email = $data['email'];
+                    $user->email_verified_at = null;
+                }
+                $user->save();
+            }
             $student->update([...$data, 'class_section_id' => $classSectionId]);
 
             // clears leftovers if switched back to regular

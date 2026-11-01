@@ -1,4 +1,6 @@
 import AdminLayout from '@/Layouts/AdminLayout';
+import EvaluationFeedCard from '@/Pages/Admin/Partials/EvaluationFeedCard';
+import ReviewPeriodCard from '@/Pages/Admin/Partials/ReviewPeriodCard';
 import ProgressBarCard from '@/Pages/Admin/Partials/ProgressBarCard';
 import { Head, Link } from '@inertiajs/react';
 
@@ -11,7 +13,7 @@ const STATUS_STYLES = {
 };
 
 // office admin home: assigned office, active period
-export default function OfficeDashboard({ summary }) {
+export default function OfficeDashboard({ summary, evaluations, filterOptions, selectedFilters, periods = [], isReviewOpen = false }) {
     const stats = [
         { label: 'Average Rating', value: summary.responses > 0 ? `${summary.rating.toFixed(2)} / 4.00` : '—' },
         { label: 'Responses', value: summary.responses },
@@ -65,13 +67,12 @@ export default function OfficeDashboard({ summary }) {
                 </div>
             </div>
 
-            <div className="mt-4 rounded-xl bg-white p-5 shadow-sm">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">
-                    Student Feedback
-                </p>
-                <p className="mt-2 whitespace-pre-line text-sm text-gray-600">
-                    {summary.feedback || 'No feedback submitted yet.'}
-                </p>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_2fr]">
+                <ReviewPeriodCard periods={periods} isOpen={isReviewOpen} canManage={false} />
+                <div className="min-w-0">
+                    <EvaluationFeedCard evaluations={evaluations} filterOptions={filterOptions} selectedFilters={selectedFilters} />
+                </div>
             </div>
         </AdminLayout>
     );

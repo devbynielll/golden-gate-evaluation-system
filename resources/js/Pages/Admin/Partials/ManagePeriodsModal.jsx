@@ -18,6 +18,11 @@ const formatMonthDay = (isoDate) =>
     });
 
 const formatDuration = (start, end) => {
+    // Legacy/partial Inertia payloads must not crash the entire dashboard.
+    if (typeof start !== 'string' || typeof end !== 'string'
+        || !/^\d{4}-\d{2}-\d{2}/.test(start) || !/^\d{4}-\d{2}-\d{2}/.test(end)) return 'Dates unavailable';
+    start = start.slice(0, 10);
+    end = end.slice(0, 10);
     const startYear = start.slice(0, 4);
     const endYear = end.slice(0, 4);
     const startLabel = formatMonthDay(start);

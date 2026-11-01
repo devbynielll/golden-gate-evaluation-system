@@ -24,6 +24,15 @@ class ClassImportController extends Controller
         return response()->json($this->academicUpload($request, $program, 'class', $periodId));
     }
 
+    public function validateImport(Request $request, Department $department, Program $program): JsonResponse
+    {
+        $this->ensureProgramBelongsToDepartment($department,$program);
+        $data=$request->validate(['termId'=>['required','integer','exists:review_periods,id']]);
+        $periodId=ActiveClassPeriod::resolve((int)$data['termId']);
+        return response()->json($this->academicImport($request,$program,'class',['year','block','subjectCode'],['facultyId','description','facultyName'],
+            fn($rows,$mapping)=>(new ImportClassRowsJob($rows,$mapping,0,$program->id,$periodId))->review(),$periodId,true));
+    }
+
     public function store(Request $request, Department $department, Program $program): JsonResponse
     {
         $this->ensureProgramBelongsToDepartment($department, $program);

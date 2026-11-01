@@ -52,19 +52,26 @@ class FacultyImportController extends Controller
             fn (array $chunk) => new ImportFacultyRowsJob(
                 $chunk, $data['mapping'], array_key_first($chunk) + 1, $batch->id, $program->id,
             ),
-            $this->chunkRows($dataRows),
+            $this->chunkRows($dataRows, 25),
         );
 
         $path = Cache::pull("import-upload:{$data['token']}")['path'] ?? null;
-        Bus::batch($jobs)
+        $busBatch = Bus::batch($jobs)
             ->onQueue('imports')
-            ->then(function (Batch $busBatch) use ($batch, $path) {
+            ->then(static function (Batch $busBatch) use ($batch, $path) {
                 $batch->markCompleted();
                 if ($path) {
                     Storage::delete($path);
                 }
             })
+            ->catch(static function (Batch $busBatch, \Throwable $error) use ($batch) {
+                $batch->markFailed();
+            })
             ->dispatch();
+        $batch->update(['bus_batch_id' => $busBatch->id]);
+        if ($jobs === []) {
+            $batch->markCompleted();
+        }
 
         return response()->json(['batchId' => $batch->id]);
     }

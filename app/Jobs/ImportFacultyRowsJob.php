@@ -26,17 +26,21 @@ class ImportFacultyRowsJob implements ShouldQueue
 
     public function handle(): void
     {
+        if ($this->batchId && $this->batch()?->cancelled()) {
+            return;
+        }
+
         $batch = ImportBatch::find($this->importBatchId);
         $program = Program::find($this->programId);
         if (! $batch || ! $program) {
             return;
         }
 
-        foreach ($this->rows as $i => $row) {
+        foreach (array_values($this->rows) as $i => $row) {
             $rowNumber = $this->firstRowNumber + $i;
 
             try {
-                $this->importRow($program, $row, $batch);
+                \Illuminate\Support\Facades\DB::transaction(fn () => $this->importRow($program, $row, $batch));
             } catch (\Throwable $e) {
                 $batch->recordFailure($rowNumber, $e->getMessage());
             }

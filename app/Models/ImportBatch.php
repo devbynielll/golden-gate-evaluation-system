@@ -21,10 +21,12 @@ class ImportBatch extends Model
 
     public const STATUS_COMPLETED = 'completed';
 
+    public const STATUS_FAILED = 'failed';
+
     protected $fillable = [
         'type', 'department_id', 'program_id', 'status',
         'total_rows', 'processed_rows', 'success_count', 'failure_count',
-        'skipped_count', 'enrollments_count', 'skipped', 'errors', 'bus_batch_id', 'created_by',
+        'regular_count', 'irregular_count', 'skipped_count', 'enrollments_count', 'skipped', 'errors', 'bus_batch_id', 'created_by',
     ];
 
     protected $casts = [
@@ -32,11 +34,12 @@ class ImportBatch extends Model
         'skipped' => 'array',
     ];
 
-    public function recordSuccess(int $enrollments = 0): void
+    public function recordSuccess(int $enrollments = 0, ?bool $irregular = null): void
     {
         DB::table('import_batches')->where('id', $this->id)->update([
             'processed_rows' => DB::raw('processed_rows + 1'),
             'success_count' => DB::raw('success_count + 1'),
+            ...($irregular === null ? [] : [($irregular ? 'irregular_count' : 'regular_count') => DB::raw(($irregular ? 'irregular_count' : 'regular_count').' + 1')]),
             'enrollments_count' => DB::raw('enrollments_count + '.$enrollments),
             'status' => self::STATUS_PROCESSING,
             'updated_at' => now(),
@@ -79,8 +82,14 @@ class ImportBatch extends Model
         ]);
     }
 
+    public function markFailed(): void
+    {
+        $this->update(['status' => self::STATUS_FAILED]);
+    }
+
     public function markCompleted(): void
     {
-        $this->update(['status' => self::STATUS_COMPLETED]);
+        $this->refresh();
+        $this->update(['status' => $this->processed_rows >= $this->total_rows ? self::STATUS_COMPLETED : self::STATUS_FAILED]);
     }
 }

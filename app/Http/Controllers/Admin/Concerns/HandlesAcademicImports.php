@@ -41,7 +41,7 @@ trait HandlesAcademicImports
         return ['token' => $token, 'totalRows' => count($rows), 'previewRows' => array_slice($rows, 0, 15)];
     }
 
-    protected function academicImport(Request $request, Program $program, string $type, array $required, array $optional, callable $run, ?int $periodId = null): array
+    protected function academicImport(Request $request, Program $program, string $type, array $required, array $optional, callable $run, ?int $periodId = null, bool $review = false): array
     {
         $rules = [
             'token' => ['required', 'uuid'],
@@ -76,6 +76,7 @@ trait HandlesAcademicImports
             }
             $rows = array_slice($rows, $data['startRow'] - 1, null, true);
             abort_unless(count($rows), 422, 'No data rows remain at the selected start row.');
+            if ($review) return $run($rows,$data['mapping'],null);
             $batch = ImportBatch::create([
                 'type' => $type, 'program_id' => $program->id, 'department_id' => $program->department_id,
                 'created_by' => $request->user()->id, 'total_rows' => count($rows),

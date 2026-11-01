@@ -1,3 +1,5 @@
+> **Historical workflow reference:** The current UI is documented in [Unified Student Import](UNIFIED_STUDENT_IMPORT.md). The older mode-specific/subject-column instructions below are retained for historical and legacy API context and are not instructions for the current mixed import screen.
+
 # Simplified Student Import
 
 In a program's Students tab, open the existing **Import Students** modal. Upload a supported file, map roster fields, review the proposed results, then confirm. The modal keeps the existing styling and upload → map → review → results flow.

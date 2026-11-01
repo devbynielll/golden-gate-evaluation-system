@@ -96,9 +96,9 @@ class StudentImportAnalyzer
     }
 
     // works out what happens to each record, writes nothing
-    public function analyze(Program $program, array $records, bool $updateExisting, bool $regularOnly = false, bool $irregularOnly = false): array
+    public function analyze(Program $program, array $records, bool $updateExisting, bool $regularOnly = false, bool $irregularOnly = false, bool $mixed = false): array
     {
-        $rosterOnly = $regularOnly || $irregularOnly;
+        $rosterOnly = $regularOnly || $irregularOnly || $mixed;
         $subjectMap = $rosterOnly ? [] : $program->subjects()->pluck('id', 'code')
             ->mapWithKeys(fn ($id, $code) => [strtoupper($code) => $id])->all();
         // enrollments need an active term
@@ -118,7 +118,7 @@ class StudentImportAnalyzer
             ->merge(User::whereIn(DB::raw('LOWER(email)'), $emails)->pluck('email'))
             ->map('strtolower')->flip();
 
-        return array_map(function (array $record) use ($program, $term, $updateExisting, $regularOnly, $irregularOnly, $rosterOnly, $subjectMap, $offerings, $students, $takenNumbers, $takenEmails) {
+        return array_map(function (array $record) use ($program, $term, $updateExisting, $regularOnly, $irregularOnly, $mixed, $rosterOnly, $subjectMap, $offerings, $students, $takenNumbers, $takenEmails) {
             $f = $record['fields'];
             $result = $record + ['action' => self::ACTION_ERROR, 'messages' => [], 'warnings' => [], 'subjectIds' => [], 'subjectCodes' => [], 'pivot' => [], 'alreadyEnrolled' => [], 'term' => $term?->label()];
             $result['messages'] = $record['fileErrors'];
@@ -173,7 +173,7 @@ class StudentImportAnalyzer
                 return $this->analyzeExisting($result, $existing, $program, $rosterOnly ? false : $updateExisting, $known, $term !== null);
             }
 
-            return $this->analyzeNew($result, $f, $known, $takenNumbers, $takenEmails, $term !== null, $regularOnly, $irregularOnly);
+            return $this->analyzeNew($result, $f, $known, $takenNumbers, $takenEmails, $term !== null, $regularOnly, $irregularOnly, $mixed);
         }, $records);
     }
 
@@ -266,14 +266,14 @@ class StudentImportAnalyzer
         return $result;
     }
 
-    private function analyzeNew(array $result, array $f, array $known, $takenNumbers, $takenEmails, bool $hasTerm, bool $regularOnly = false, bool $irregularOnly = false): array
+    private function analyzeNew(array $result, array $f, array $known, $takenNumbers, $takenEmails, bool $hasTerm, bool $regularOnly = false, bool $irregularOnly = false, bool $mixed = false): array
     {
         $isIrregular = in_array(strtolower($f['isIrregular']), ['1', 'y', 'yes', 'true'], true);
         if ($irregularOnly && ! $isIrregular) {
             $result['messages'][] = 'Irregular Import requires IRREGULAR (Y/N) = Y. Use the Regular tab for N rows.';
         }
 
-        if ($regularOnly && ! in_array(strtolower($f['isIrregular']), ['', '0', 'n', 'no', 'false', '1', 'y', 'yes', 'true'], true)) {
+        if (($regularOnly || $mixed) && ! in_array(strtolower($f['isIrregular']), ['', '0', 'n', 'no', 'false', '1', 'y', 'yes', 'true'], true)) {
             $result['messages'][] = 'Irregular? must be Y/N (or blank for regular).';
         }
 
@@ -312,8 +312,8 @@ class StudentImportAnalyzer
 
         if ($isIrregular) {
             if ($regularOnly) {
-                $result['messages'][] = 'This Student Import creates regular students only. Use Add Student, select Irregular, and choose the attended courses and blocks in the manual enrollment form.';
-            } elseif ($irregularOnly) {
+                $result['messages'][] = 'This legacy Regular-only mode does not accept Y rows. Reopen Import Students to import Regular and Irregular rows together. Use Add Student if you prefer manual account creation; assign irregular subjects using Edit Student.';
+            } elseif ($irregularOnly || $mixed) {
                 $result['warnings'][] = 'No subjects will be assigned. Open Edit Student after import to select the attended subjects and class sections.';
             } elseif (! $result['codes']) {
                 $result['messages'][] = 'Irregular student has no subject codes.';

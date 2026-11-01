@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
+import { startImportPolling } from './importPolling';
 import { router } from '@inertiajs/react';
 import Modal from '@/Components/Modal';
 import Spinner from '@/Components/Spinner';
@@ -40,6 +41,7 @@ export default function ImportModal({
     accept = '.xlsx,.xls,.csv,.doc,.docx',
     helpText = null,
     studentRosterOnly = false,
+    classRows = false,
     onClose,
 }) {
     const [step, setStep] = useState('upload');
@@ -61,8 +63,12 @@ export default function ImportModal({
 
     const [batchId, setBatchId] = useState(null);
     const [status, setStatus] = useState(null);
+    const stopPolling = useRef(null);
+    useEffect(() => () => stopPolling.current?.(), []);
+    useEffect(() => { if (!show) stopPolling.current?.(); }, [show]);
 
     const reset = () => {
+        stopPolling.current?.();
         setStep('upload');
         setBusy(false);
         setError('');
@@ -153,14 +159,12 @@ export default function ImportModal({
     };
 
     const poll = (id) => {
-        const tick = async () => {
-            const { data } = await axios.get(route('import-batches.show', id));
-            setStatus(data);
-            if (data.status !== 'completed') {
-                setTimeout(tick, 1200);
-            }
-        };
-        tick();
+        stopPolling.current?.();
+        stopPolling.current = startImportPolling({
+            fetchStatus: async () => (await axios.get(route('import-batches.show', id), { timeout: 15000 })).data,
+            onStatus: setStatus,
+            onError: setError,
+        });
     };
 
     const finish = () => {
@@ -372,9 +376,13 @@ export default function ImportModal({
                             </p>
                         )}
 
+                        {studentRosterOnly && <p className="text-xs text-gray-500">
+                            New accounts: {review.summary.regular ?? 0} Regular · {review.summary.irregular ?? 0} Irregular.
+                            Irregular students receive no automatic subjects or sections.
+                        </p>}
                         <div className={`grid grid-cols-2 gap-2 text-center ${studentRosterOnly ? 'sm:grid-cols-3' : 'sm:grid-cols-5'}`}>
                             {[
-                                ['create', 'New students', review.summary.create, 'text-green-700'],
+                                ['create', classRows ? 'New class rows' : 'New students', review.summary.create, 'text-green-700'],
                                 ...(!studentRosterOnly ? [['enroll', 'Existing, subjects added', review.summary.enroll, 'text-blue-700']] : []),
                                 ['skip', 'Skipped', review.summary.skip, 'text-amber-600'],
                                 ['error', 'Errors', review.summary.error, 'text-red-600'],
@@ -389,7 +397,7 @@ export default function ImportModal({
                                     <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">{label}</p>
                                 </button>
                             ))}
-                            {!studentRosterOnly && (
+                            {!studentRosterOnly && !classRows && (
                                 <div className="rounded-lg border border-gray-200 p-2">
                                     <p className="text-xl font-extrabold text-gray-700">{review.summary.subjectsToAdd}</p>
                                     <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Enrollments</p>
@@ -402,9 +410,9 @@ export default function ImportModal({
                                 <thead className="sticky top-0 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-400">
                                     <tr>
                                         <th className="px-3 py-2">Row</th>
-                                        <th className="px-3 py-2">Student</th>
+                                        <th className="px-3 py-2">{classRows ? 'Class' : 'Student'}</th>
                                         <th className="px-3 py-2">Result</th>
-                                        <th className="px-3 py-2">{studentRosterOnly ? 'Notes' : 'Subjects / notes'}</th>
+                                        <th className="px-3 py-2">{studentRosterOnly ? 'Student type / notes' : 'Subjects / notes'}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -419,9 +427,10 @@ export default function ImportModal({
                                                     {r.name}
                                                 </td>
                                                 <td className="px-3 py-1.5 font-semibold">
-                                                    {{ create: 'Add student', enroll: 'Add subjects', skip: 'Skip', error: 'Error' }[r.action]}
+                                                    {{ create: classRows ? 'Add assignments' : 'Add student', enroll: 'Add subjects', skip: 'Skip', error: 'Error' }[r.action]}
                                                 </td>
                                                 <td className="px-3 py-1.5">
+                                                    {studentRosterOnly && <p className="text-xs font-semibold text-gray-600">{r.studentType}</p>}
                                                     {!studentRosterOnly && r.subjects.length > 0 && (
                                                         <p className="text-gray-700">{r.subjects.join(', ')}</p>
                                                     )}
@@ -467,9 +476,9 @@ export default function ImportModal({
                 {step === 'progress' && (
                     <div className="mt-6 space-y-4">
                         <div className="flex items-center justify-center gap-3">
-                            {status?.status !== 'completed' && <Spinner className="h-5 w-5 text-green-600" />}
+                            {!['completed', 'failed'].includes(status?.status) && <Spinner className="h-5 w-5 text-green-600" />}
                             <p className="text-sm font-semibold text-gray-700">
-                                {status?.status === 'completed' ? 'Import complete' : 'Importing...'}
+                                {status?.status === 'completed' ? 'Import complete' : status?.status === 'failed' ? 'Import interrupted' : status?.processedRows > 0 ? 'Importing...' : 'Queued — waiting for the import worker...'}
                             </p>
                         </div>
 
@@ -498,6 +507,15 @@ export default function ImportModal({
                             <span className="text-red-500">{status?.failureCount ?? 0} failed</span>
                         </p>
 
+                        {studentRosterOnly && status && (
+                            <p className="text-center text-xs text-gray-500">
+                                Created: {status.regularCount ?? 0} Regular · {status.irregularCount ?? 0} Irregular.
+                                Irregular subjects must be assigned using Edit Student.
+                            </p>
+                        )}
+                        {status?.message && <p className="text-xs text-red-600">{status.message}</p>}
+                        {error && <button type="button" onClick={() => poll(batchId)} className="text-xs font-bold text-green-700">Retry progress check</button>}
+
                         {status?.skipped?.length > 0 && (
                             <div className="max-h-32 overflow-y-auto rounded-lg border border-amber-100 bg-amber-50 p-3">
                                 {status.skipped.map((s, i) => (
@@ -518,7 +536,7 @@ export default function ImportModal({
                             </div>
                         )}
 
-                        {status?.status === 'completed' && (
+                        {['completed', 'failed'].includes(status?.status) && (
                             <div className="flex justify-center">
                                 <button
                                     type="button"

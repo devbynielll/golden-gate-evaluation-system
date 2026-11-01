@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import logo from '@/Assets/logo.png';
+import { loadReportLogo } from './reportLogo';
 
 const GREEN = [8, 137, 12];
 const DARK = [30, 41, 59];
@@ -13,26 +14,15 @@ const today = () =>
         year: 'numeric',
     });
 
-// file path to base64 image
-async function loadLogo() {
-    const response = await fetch(logo);
-    const blob = await response.blob();
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(blob);
-    });
-}
-
 // short (letter) paper always, no legal size even for long tables
 export default async function downloadReport({ subject, reviewPeriod, summaryRows, detail }) {
     const kind = detail ? 'Individual' : 'Performance Summary';
     const filename = `${subject}-${kind.replace(' ', '-')}-Report.pdf`;
-    const logoData = await loadLogo();
+    const logoData = await loadReportLogo(logo);
 
     const doc = new jsPDF({ unit: 'mm', format: 'letter' });
 
-    doc.addImage(logoData, 'PNG', 15, 14, 20, 20);
+    doc.addImage(logoData, 'JPEG', 15, 14, 20, 20);
     doc.setTextColor(...GREEN);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
