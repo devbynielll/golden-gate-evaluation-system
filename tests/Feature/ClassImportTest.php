@@ -214,4 +214,95 @@ class ClassImportTest extends TestCase
         $this->assertDatabaseCount('class_sections', 0);
     }
 
+
+    public function test_multi_subject_row_maps_professors_positionally_and_deduplicates_without_reassignment(): void
+    {
+        $b=$this->execute($this->csv('1,A," IT101, IT102, IT103 ","F1,F2,F1"'."\n"));
+        $this->assertSame(1,$b->success_count);$this->assertDatabaseCount('class_subjects',3);
+        foreach (['IT101'=>'F1','IT102'=>'F2','IT103'=>'F1'] as $code=>$id) {
+            $this->assertSame($id,ClassSubject::where('subject_id',$this->program->subjects()->where('code',$code)->value('id'))->firstOrFail()->faculty->faculty_id);
+        }
+        $this->assertSame(1,$this->execute($this->csv('1,A,"IT101,IT102","F1,F2"'."\n"))->skipped_count);
+    }
+    public function test_invalid_multi_subject_rows_roll_back_every_assignment_and_section(): void
+    {
+        foreach (['1,A,"IT101,MISSING","F1,F2"','1,A,"IT101,IT102",F1','1,A,"IT101,IT102","F1,UNKNOWN"','1,A,"IT101,IT101","F1,F2"'] as $row) {
+            $this->assertSame(1,$this->execute($this->csv($row."\n"))->failure_count);
+            $this->assertDatabaseCount('class_subjects',0);$this->assertDatabaseCount('class_sections',0);
+        }
+    }
+
+    public function test_multi_subject_review_lists_assignments_without_saving_and_keeps_upload_for_confirmation(): void
+    {
+        $token=$this->upload($this->csv('1,A,"IT101,IT102","F1,F2"'."\n"));
+        $payload=['token'=>$token,'mapping'=>$this->mapping,'startRow'=>2,'termId'=>$this->period->id];
+        $this->postJson($this->url('validate'),$payload)->assertOk()->assertJsonPath('summary.create',1)->assertJsonCount(2,'rows.0.subjects');
+        $this->assertDatabaseCount('class_subjects',0);$this->assertDatabaseCount('class_sections',0);$this->assertDatabaseCount('import_batches',0);
+        $this->postJson($this->url('store'),$payload)->assertOk();$this->assertDatabaseCount('class_subjects',2);
+    }
+
+    public function test_invalid_multi_row_review_reports_every_bad_reference_without_writes(): void
+    {
+        $token=$this->upload($this->csv('1,A,"MISSING,IT102","F1,UNKNOWN"'."\n"));
+        $response=$this->postJson($this->url('validate'),['token'=>$token,'mapping'=>$this->mapping,'startRow'=>2,'termId'=>$this->period->id])->assertOk()->assertJsonPath('summary.error',1);
+        $messages=implode(' ',$response->json('rows.0.messages'));$this->assertStringContainsString('MISSING',$messages);$this->assertStringContainsString('IT102',$messages);
+        $this->assertDatabaseCount('class_subjects',0);$this->assertDatabaseCount('class_sections',0);$this->assertDatabaseCount('import_batches',0);
+    }
+
+    private function clientReferences(): void
+    {
+        $this->program->subjects()->create(['code'=>'GE123','description'=>'Art Appreciation','year_level'=>1]);
+        $this->program->subjects()->create(['code'=>'IT456','description'=>'Information Management','year_level'=>1]);
+        $this->program->faculty()->create(['faculty_id'=>'F64722','name'=>'NEIL PEREZ']);
+        $this->program->faculty()->create(['faculty_id'=>'F88888','name'=>'MARVIN SANTOS']);
+    }
+    private function clientXlsx(array $rows): string
+    {
+        $sheet=new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet->getActiveSheet()->fromArray(array_merge([['YEAR LEVEL','BLOCK/SECTION','SUBJECT CODE','DESCRIPTION','FACULTY ID','FACULTY NAME','REFERENCE']],$rows));
+        $path=Storage::path('client-structure.xlsx');(new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($sheet))->save($path);$sheet->disconnectWorksheets();
+        $response=$this->postJson($this->url('preview'),['file'=>new UploadedFile($path,'classes.xlsx',null,null,true),'termId'=>$this->period->id])->assertOk();
+        return $response->json('token');
+    }
+    private function clientPayload(string $token): array
+    {
+        return ['token'=>$token,'mapping'=>['year'=>0,'block'=>1,'subjectCode'=>2,'description'=>3,'facultyId'=>4,'facultyName'=>5],'startRow'=>2,'termId'=>$this->period->id];
+    }
+    public function test_exact_client_xlsx_comma_columns_on_row_three_preview_and_save_positionally(): void
+    {
+        $this->clientReferences();
+        $token=$this->clientXlsx([[1,'B','GE123','Art Appreciation','F64722','NEIL PEREZ','F64722'],[1,'A','GE123,IT456','Art Appreciation,Information Management','F64722,F88888','NEIL PEREZ,MARVIN SANTOS','not-the-ID-column']]);
+        $payload=$this->clientPayload($token);
+        $this->postJson($this->url('validate'),$payload)->assertOk()->assertJsonPath('summary.create',2)->assertJsonPath('summary.error',0)->assertJsonPath('rows.1.rows.0',3)->assertJsonPath('rows.1.subjects.1','IT456 → F88888');
+        $this->assertDatabaseCount('class_subjects',0);
+        $id=$this->postJson($this->url('store'),$payload)->assertOk()->json('batchId');$this->assertSame(2,ImportBatch::findOrFail($id)->success_count);
+        $this->assertDatabaseCount('class_subjects',3);
+        $this->assertSame('MARVIN SANTOS',ClassSubject::where('subject_id',$this->program->subjects()->where('code','IT456')->value('id'))->firstOrFail()->faculty->name);
+    }
+    public function test_row_three_wrong_mapping_reports_actual_column_counts_not_invalid_spreadsheet_claim(): void
+    {
+        $this->clientReferences();$token=$this->clientXlsx([[1,'B','GE123','Art Appreciation','F64722','NEIL PEREZ','F64722'],[1,'A','GE123,IT456','Art Appreciation,Information Management','F64722,F88888','NEIL PEREZ,MARVIN SANTOS','wrong-column']]);
+        $payload=$this->clientPayload($token);$payload['mapping']['facultyId']=6;
+        $review=$this->postJson($this->url('validate'),$payload)->assertOk();
+        $messages=implode(' ',$review->json('rows.1.messages'));$this->assertStringContainsString('Subject Code column C = 2',$messages);$this->assertStringContainsString('Faculty ID column G = 1',$messages);$this->assertSame([3],$review->json('rows.1.rows'));
+        $this->assertDatabaseCount('class_subjects',0);
+    }
+    public function test_literal_commas_are_resolved_only_from_exact_authoritative_labels_or_explicit_quoting(): void
+    {
+        $this->clientReferences();$this->program->subjects()->where('code','GE123')->update(['description'=>'Art, Culture']);$this->program->faculty()->where('faculty_id','F64722')->update(['name'=>'PEREZ, NEIL']);
+        foreach ([['A','Art, Culture,Information Management','PEREZ, NEIL,MARVIN SANTOS'],['B','"Art, Culture",Information Management','"PEREZ, NEIL",MARVIN SANTOS']] as [$block,$description,$name]) {
+            $token=$this->clientXlsx([[1,$block,'GE123,IT456',$description,'F64722,F88888',$name,'']]);
+            $id=$this->postJson($this->url('store'),$this->clientPayload($token))->assertOk()->json('batchId');$this->assertSame(1,ImportBatch::findOrFail($id)->success_count);
+        }
+        $this->assertDatabaseCount('class_subjects',4);
+    }
+    public function test_ambiguous_description_mismatched_names_and_unclosed_quotes_reject_entire_rows(): void
+    {
+        $this->clientReferences();
+        foreach ([['Art,Unknown,Information Management','NEIL PEREZ,MARVIN SANTOS'],['Art Appreciation,Information Management','WRONG PERSON,MARVIN SANTOS'],['"Art Appreciation,Information Management','NEIL PEREZ,MARVIN SANTOS']] as [$description,$name]) {
+            $token=$this->clientXlsx([[1,'A','GE123,IT456',$description,'F64722,F88888',$name,'']]);
+            $id=$this->postJson($this->url('store'),$this->clientPayload($token))->assertOk()->json('batchId');$this->assertSame(1,ImportBatch::findOrFail($id)->failure_count);
+            $this->assertDatabaseCount('class_subjects',0);$this->assertDatabaseCount('class_sections',0);
+        }
+    }
 }

@@ -88,11 +88,11 @@ export default function ReviewPeriodCard({
                 </>
             )}
 
-            <ManagePeriodsModal
+            {canManage && showManagePeriods && <ManagePeriodsModal
                 show={showManagePeriods}
                 onClose={() => setShowManagePeriods(false)}
                 periods={periods}
-            />
+            />}
         </div>
     );
 }

@@ -45,6 +45,26 @@ class SendEvaluationReminderRowsJob implements ShouldQueue
                 continue;
             }
 
+            if ($target['type'] === Evaluation::TYPE_OFFICE) {
+                if (!$period || !SendOfficeEvaluationReminder::pending($student,$period,$target['office_id'] ?? null)) {
+                    $batch->recordSkip($student->id,'No pending applicable Office evaluations.');
+                    continue;
+                }
+                $key="office-reminder:{$period->id}:{$student->id}";
+                if (\Illuminate\Support\Facades\Cache::has($key.':sent') || !\Illuminate\Support\Facades\Cache::add($key.':queued',true,now()->addMinutes(10))) {
+                    $batch->recordSkip($student->id,'Office reminder already queued or recently sent.');
+                    continue;
+                }
+                try {
+                    SendOfficeEvaluationReminder::dispatch($student->id,$period->id,$target['office_id'] ?? null,$target['actor_id'] ?? null)->onQueue('default');
+                    $batch->recordSuccess();
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Cache::forget($key.':queued');
+                    $batch->recordFailure($student->id,'Office reminder could not be queued.');
+                }
+                continue;
+            }
+
             $label = $target['type'] === Evaluation::TYPE_FACULTY
                 ? 'their faculty members'
                 : 'the offices on campus';

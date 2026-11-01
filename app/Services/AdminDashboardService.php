@@ -126,6 +126,24 @@ class AdminDashboardService
     }
 
     // every (student, type) pair still pending, for the "remind all" button — not paginated
+    public function officePendingStudents(Office $office, ?ReviewPeriod $period, ?int $departmentId = null, ?int $programId = null)
+    {
+        $query=Student::query()->with('program.department');
+        $this->narrowStudents($query,$departmentId,$programId);
+        if ($office->department_id) $query->whereHas('program',fn($q)=>$q->where('department_id',$office->department_id));
+        if (!$period || !$period->is_submission_open || !$period->is_active) return $query->whereRaw('1=0');
+        return $query->whereDoesntHave('evaluations',fn($q)=>$q->where('review_period_id',$period->id)->where('evaluatee_type',Evaluation::TYPE_OFFICE)->where('office_id',$office->id)->whereNotNull('submitted_at'));
+    }
+
+    public function officeFeed(Office $office, ?ReviewPeriod $period, ?int $departmentId, ?int $programId, int $page): array
+    {
+        $paginator=$this->officePendingStudents($office,$period,$departmentId,$programId)->orderBy('last_name')->paginate(self::FEED_PER_PAGE,page:$page);
+        return ['data'=>$paginator->getCollection()->map(fn($student)=>[
+            'id'=>$student->id,'name'=>$student->fullName(),'studentId'=>$student->student_number,
+            'submissions'=>[['type'=>Evaluation::TYPE_OFFICE,'label'=>$office->name,'status'=>'pending']],
+        ]),'meta'=>['current_page'=>$paginator->currentPage(),'last_page'=>$paginator->lastPage(),'total'=>$paginator->total(),'per_page'=>$paginator->perPage()]];
+    }
+
     public function pendingReminderTargets(?ReviewPeriod $period, ?int $departmentId, ?int $programId, bool $includeOffices = true): array
     {
         if (! $period) {

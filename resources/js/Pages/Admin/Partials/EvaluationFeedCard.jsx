@@ -329,9 +329,9 @@ export default function EvaluationFeedCard({
 
             <BatchProgressModal
                 show={bulkBatchId !== null}
-                title="Sending reminders..."
+                title="Queueing reminders..."
                 batchId={bulkBatchId}
-                successLabel="sent"
+                successLabel="queued"
                 failureLabel="failed"
                 onDone={finishBulkRemind}
             />

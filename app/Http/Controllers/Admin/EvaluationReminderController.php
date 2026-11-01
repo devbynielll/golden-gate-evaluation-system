@@ -35,6 +35,31 @@ class EvaluationReminderController extends Controller
             'Department admins only handle faculty evaluations.',
         );
 
+        $officeId=null;
+        if ($request->user()->isOfficeAdmin()) {
+            abort_unless($data['type'] === Evaluation::TYPE_OFFICE,403);
+            $officeId=$request->user()->assignedOfficeOrAbort()->id;
+            abort_if($request->has('office_id') && (int)$request->input('office_id') !== $officeId,403);
+        }
+        if ($data['type'] === Evaluation::TYPE_OFFICE) {
+            $period=$evaluations->activePeriod();
+            if (!$period || ! \App\Jobs\SendOfficeEvaluationReminder::pending($student,$period,$officeId)) {
+                return back()->with('status','No applicable Office evaluations are pending in an open active period.');
+            }
+            $key="office-reminder:{$period->id}:{$student->id}";
+            if (\Illuminate\Support\Facades\Cache::has($key.':sent') || !\Illuminate\Support\Facades\Cache::add($key.':queued',true,now()->addMinutes(10))) {
+                return back()->with('status','An Office reminder was recently queued or sent. Please wait before requesting another.');
+            }
+            try {
+                \App\Jobs\SendOfficeEvaluationReminder::dispatch($student->id,$period->id,$officeId,$request->user()->id)->onQueue('default');
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Cache::forget($key.':queued');
+                report($e);
+                return back()->with('status','The Office reminder could not be queued. Please try again.');
+            }
+            return back()->with('status','Office evaluation reminder queued. The mail worker will process delivery; queued does not mean delivered.');
+        }
+
         $label = $data['type'] === Evaluation::TYPE_FACULTY
             ? 'their faculty members'
             : 'the offices on campus';
@@ -69,7 +94,13 @@ class EvaluationReminderController extends Controller
         $programId = $filters['program_id'] ?? null;
 
         $period = $this->dashboard->activePeriod();
+        if ($request->user()->isOfficeAdmin()) {
+            $office=$request->user()->assignedOfficeOrAbort();
+            abort_if($request->has('office_id') && (int)$request->input('office_id') !== $office->id,403);
+            $targets=$this->dashboard->officePendingStudents($office,$period,$departmentId,$programId)->pluck('id')->map(fn($id)=>['student_id'=>$id,'type'=>Evaluation::TYPE_OFFICE,'office_id'=>$office->id,'actor_id'=>$request->user()->id])->all();
+        } else {
         $targets = $this->dashboard->pendingReminderTargets($period, $departmentId, $programId, includeOffices: ! $request->user()->isDepartmentAdmin());
+        }
 
         $batch = ImportBatch::create([
             'type' => ImportBatch::TYPE_REMINDER,
@@ -90,12 +121,14 @@ class EvaluationReminderController extends Controller
             array_chunk($targets, 50),
         );
 
-        Bus::batch($jobs)
+        $busBatch=Bus::batch($jobs)
             ->onQueue('imports')
-            ->then(function (Batch $busBatch) use ($batch) {
+            ->then(static function (Batch $busBatch) use ($batch) {
                 $batch->markCompleted();
             })
+            ->catch(static function (Batch $busBatch, \Throwable $error) use ($batch) { $batch->markFailed(); })
             ->dispatch();
+        $batch->update(['bus_batch_id'=>$busBatch->id]);
 
         return response()->json(['batchId' => $batch->id]);
     }

@@ -31,10 +31,15 @@ class ImportStudentRowsJob implements ShouldQueue
         private bool $updateExisting = false,
         private bool $regularOnly = false,
         private bool $irregularOnly = false,
+        private bool $mixed = false,
     ) {}
 
     public function handle(StudentImportAnalyzer $analyzer): void
     {
+        if ($this->batchId && $this->batch()?->cancelled()) {
+            return;
+        }
+
         $batch = ImportBatch::find($this->importBatchId);
         $program = Program::find($this->programId);
         if (! $batch || ! $program) {
@@ -42,7 +47,7 @@ class ImportStudentRowsJob implements ShouldQueue
         }
 
         // re-checked here, data may have changed since the preview
-        $results = $analyzer->analyze($program, $this->records, $this->updateExisting, $this->regularOnly ?? false, $this->irregularOnly ?? false);
+        $results = $analyzer->analyze($program, $this->records, $this->updateExisting, $this->regularOnly ?? false, $this->irregularOnly ?? false, $this->mixed ?? false);
         $enrolledAny = false;
 
         foreach ($results as $result) {
@@ -55,7 +60,7 @@ class ImportStudentRowsJob implements ShouldQueue
                     StudentImportAnalyzer::ACTION_SKIP => $batch->recordSkip($row, implode(' ', $result['messages'])),
                     default => $batch->recordFailure($row, implode(' ', $result['messages'])),
                 };
-                $enrolledAny = $enrolledAny || $result['pivot'] !== [];
+                $enrolledAny = $enrolledAny || $result['action'] === StudentImportAnalyzer::ACTION_CREATE || $result['pivot'] !== [];
             } catch (\Throwable $e) {
                 $batch->recordFailure($row, $e->getMessage());
             }
@@ -71,7 +76,7 @@ class ImportStudentRowsJob implements ShouldQueue
         $f = $result['fields'];
         $password = Str::password(12);
 
-        DB::transaction(function () use ($program, $f, $result, $password) {
+        DB::transaction(function () use ($program, $f, $result, $password, $batch) {
             $user = User::create([
                 'name' => trim("{$f['firstName']} {$f['lastName']}"),
                 'email' => $f['email'],
@@ -104,9 +109,8 @@ class ImportStudentRowsJob implements ShouldQueue
             }
 
             Mail::to($student->email)->queue(new StudentAccountCreated($student, $password));
+            $batch->recordSuccess(count($result['subjectIds']), $result['isIrregular']);
         });
-
-        $batch->recordSuccess(count($result['subjectIds']));
     }
 
     // add only, never removes or edits

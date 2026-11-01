@@ -20,12 +20,12 @@ Existing `?term=ID` workspace links can still view historical schedules. Their e
 
 The old authorized Schedule Copy backend remains unchanged for compatibility, including its existing explicit source/target contract. No copy control or replacement scheduling feature is exposed in the normal interface. This compatibility endpoint is separate from the active-only normal Class write paths; existing role restrictions remain. No new professor cross-program or irregular-student policy is introduced.
 
-One row represents **one subject offering**, not an entire class replacement:
+A row may contain one offering or a comma-separated positional list. It never replaces an entire class:
 
 - **Year Level**: integer 1–6.
 - **Block / Section**: existing-style block value, such as A, up to 10 characters; do not enter a combined program/year/class label.
-- **Subject Code**: an existing subject in this program.
-- **Faculty ID**: optional existing directory ID in this program, not a name or internal numeric key. Blank, unmapped, or the reserved value `TBA` means unassigned. To assign a directory record literally named ID `TBA`, use manual Edit instead.
+- **Subject Code**: existing subject codes in this program, comma-separated for multiple assignments.
+- **Faculty ID**: existing institution-wide directory IDs, matched positionally to Subject Codes; cross-program faculty are allowed. Repeat an ID when the same professor teaches multiple subjects. A single-subject row may leave it blank/unmapped for TBA. Multi-subject rows require equal counts and explicit TBA placeholders; one ID is never broadcast across subjects. To assign a directory record literally named ID TBA, use manual Edit.
 
 The current program + year + block identifies the section. An absent section is created only when a valid offering can be saved. A section's year is not required to match a subject's year, consistent with manual Class editing. Faculty qualifications do not restrict teaching assignments. One professor can teach many subjects/classes. Different professors per subject and TBA can be mixed.
 
@@ -33,8 +33,16 @@ Imports **only add missing offerings** in the selected period. They never delete
 
 ## Results and safety
 
-Preview/mapping does not write academic records. Import is an explicit confirmation; valid rows commit independently in transactions, invalid rows fail without partial row changes. Results show physical spreadsheet row numbers and counts of imported, skipped and failed rows (up to 200 error/skip details, matching the existing batch infrastructure). Class successes count newly added offerings, not class sections. No whole-file rollback is promised. A failure in one row does not remove earlier successful independent rows.
+Preview/mapping does not write academic records. Import is an explicit confirmation; valid rows commit independently in transactions, invalid rows fail without partial row changes. Results show physical spreadsheet row numbers and counts of imported, skipped and failed rows (up to 200 error/skip details, matching the existing batch infrastructure). Class successes count spreadsheet rows with at least one newly added offering, not individual offerings or class sections. No whole-file rollback is promised. A failure in one row does not remove earlier successful independent rows.
 
 These bounded imports run synchronously in one job, so no additional queue worker is needed. The existing progress/result polling reads the completed ImportBatch. Uploads expire after 30 minutes and are bound to the uploading administrator, program, import type and (for Classes) term. Used tokens cannot be replayed. Duplicate column mappings and out-of-file mappings are rejected before creating a batch.
 
 Import rows acquire a program lock, then section/offering locks for Classes. The section/offering order matches manual Class editing and evaluation submission. Existing uniqueness/foreign-key constraints remain authoritative; a write conflict rolls back that row and reports an error. Real concurrent InnoDB lock-contention testing remains separate from the isolated automated suite.
+
+## Positional Class Review and labels
+
+Map Description and Faculty Name when present. Comma-separated labels must match authoritative Subject Codes and Faculty IDs in the same order. For example GE123,IT456 and F64722,F88888 correspond to Art Appreciation,Information Management and NEIL PEREZ,MARVIN SANTOS. IDs determine relationships; names never select or create a professor.
+
+A literal comma inside a label can be quoted within the cell: `"Art, Culture",Information Management`. Doubled quotes represent a literal quote. Unquoted extra commas are accepted only when the entire ordered text exactly matches the existing authoritative labels; ambiguous, unknown or mismatched values fail. Older pipe-separated label files remain supported, but commas are the current convention.
+
+Class Review lists assignments without saving; Confirm revalidates references and commits each spreadsheet row atomically. A bad assignment rolls back the whole row. Count errors identify mapped Excel columns and parsed counts so an incorrect mapping is distinguishable from invalid source data. Read [source synchronization/release checks](SOURCE_SYNC.md) before deploying new application classes with authoritative Composer autoloading.

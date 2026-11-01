@@ -174,7 +174,7 @@ export default function ForgotPasswordModal({ show, onClose }) {
                                     Enter Verification Code
                                 </h2>
                                 <p className="mt-1 text-center text-xs text-gray-500">
-                                    We sent a 6-digit code to
+                                    If an account exists for this address, a 6-digit code has been requested for
                                 </p>
                                 <p className="text-center text-sm font-semibold text-green-700">
                                     {email}

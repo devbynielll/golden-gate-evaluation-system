@@ -829,11 +829,13 @@ export default function ManageProgramView({
                 title="Import Classes"
                 previewUrl={route('programs.classes.import.preview', base)}
                 importUrl={route('programs.classes.import.store', base)}
+                validateUrl={route('programs.classes.import.validate', base)}
+                classRows
                 fields={CLASS_IMPORT_FIELDS}
                 extraData={{ termId: term?.id }}
                 fileLabel="Excel / CSV File"
                 accept=".csv,.xlsx,.xls"
-                helpText={`One row per subject offering: Year Level, Block / Section, Subject Code, optional Faculty ID (blank or TBA = unassigned). Program: ${program.code}. Active period: ${term?.label ?? 'none'}. Up to 2,000 rows including the header. Adds missing offerings only; existing assignments are never replaced or removed.`}
+                helpText={`Use comma-separated Subject Codes and matching Faculty IDs in the same order (repeat IDs when needed; use explicit TBA). Single-subject rows are unchanged. Descriptions and Faculty Names also use matching comma-separated values. Quote whole names/descriptions containing literal commas. Verify every mapped column in Review. Entire invalid rows are rejected. Program: ${program.code}. Active period: ${term?.label ?? 'none'}. Up to 2,000 rows including the header. Adds missing offerings only; existing assignments are never replaced or removed.`}
                 onClose={() => setClassImportOpen(false)}
             />
 
@@ -861,16 +863,14 @@ export default function ManageProgramView({
             <ImportModal
                 key={`student-import-${studentSubTab}`}
                 show={studentImportOpen}
-                title={studentSubTab === 'Irregular' ? 'Import Irregular Students' : 'Import Students'}
+                title="Import Students"
                 previewUrl={route('programs.students.import.preview', base)}
                 importUrl={route('programs.students.import.store', base)}
                 validateUrl={route('programs.students.import.validate', base)}
                 studentRosterOnly
-                extraData={{ mode: studentSubTab === 'Irregular' ? 'irregular' : 'regular' }}
-                helpText={studentSubTab === 'Irregular'
-                    ? 'Import basic information with IRREGULAR (Y/N) = Y. Year and block do not assign subjects. After import, open Edit Student to select attended subjects and class sections. Existing students are left unchanged.'
-                    : 'Import regular students with IRREGULAR (Y/N) = N (or blank) using their year and block. Existing students are left unchanged. Use the Irregular tab to import Y rows, then assign their subjects manually.'}
-                fields={STUDENT_IMPORT_FIELDS.map((field) => field.key === 'isIrregular' && studentSubTab === 'Irregular' ? { ...field, required: true } : field)}
+                extraData={{ mode: 'mixed' }}
+                helpText="Import Regular (N or blank) and Irregular (Y) students together. Regular students use their year and block. Irregular students receive no automatic subjects: open Edit Student after import to assign attended subjects and sections. Existing students are left unchanged."
+                fields={STUDENT_IMPORT_FIELDS.map((field) => field.key === 'isIrregular' ? { ...field, required: true } : field)}
                 onClose={() => setStudentImportOpen(false)}
             />
         </AdminLayout>

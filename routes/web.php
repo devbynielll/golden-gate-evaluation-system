@@ -96,6 +96,7 @@ Route::middleware(['auth', 'verified', 'role:super_admin,department_admin'])->gr
         Route::post('/admin/departments/{department}/programs/{program}/faculty/import', [FacultyImportController::class, 'store'])->name('programs.faculty.import.store');
 
         Route::post('/admin/departments/{department}/programs/{program}/classes/import/preview', [ClassImportController::class, 'preview'])->name('programs.classes.import.preview');
+        Route::post('/admin/departments/{department}/programs/{program}/classes/import/validate', [ClassImportController::class, 'validateImport'])->name('programs.classes.import.validate');
         Route::post('/admin/departments/{department}/programs/{program}/classes/import', [ClassImportController::class, 'store'])->name('programs.classes.import.store');
         Route::post('/admin/departments/{department}/programs/{program}/classes', [ClassSectionController::class, 'store'])->name('programs.classes.store');
         Route::put('/admin/departments/{department}/programs/{program}/classes/{classSection}', [ClassSectionController::class, 'update'])->name('programs.classes.update');
@@ -110,12 +111,7 @@ Route::middleware(['auth', 'verified', 'role:super_admin,department_admin'])->gr
         Route::post('/admin/departments/{department}/programs/{program}/students/import', [StudentImportController::class, 'store'])->name('programs.students.import.store');
     });
 
-    Route::get('/admin/import-batches/{importBatch}', [ImportBatchController::class, 'show'])->name('import-batches.show');
 
-    Route::post('/admin/students/{student}/remind', [EvaluationReminderController::class, 'store'])
-        ->name('students.remind');
-    Route::post('/admin/evaluations/remind-all', [EvaluationReminderController::class, 'storeBulk'])
-        ->name('evaluations.remind-all');
 
     Route::get('/admin/courses/search', [CourseSearchController::class, 'search'])
         ->name('courses.search');
@@ -123,6 +119,16 @@ Route::middleware(['auth', 'verified', 'role:super_admin,department_admin'])->gr
         ->name('courses.filters');
 
     Route::get('/admin/reports/faculty', [ReportController::class, 'faculty'])->name('reports.faculty');
+});
+
+Route::middleware(['auth', 'verified', 'role:super_admin,department_admin,office_admin'])->group(function () {
+    Route::get('/admin/import-batches/{importBatch}', [ImportBatchController::class, 'show'])->name('import-batches.show');
+    Route::post('/admin/students/{student}/remind', [EvaluationReminderController::class, 'store'])
+        ->name('students.remind');
+    Route::post('/admin/evaluations/remind-all', [EvaluationReminderController::class, 'storeBulk'])
+        ->name('evaluations.remind-all');
+
+
 });
 
 // super admin + the office admin

@@ -99,6 +99,14 @@ class DashboardController extends Controller
 
         return Inertia::render('Admin/OfficeDashboard', [
             'summary' => $this->reports->officeSummary($office, $period),
+            'periods' => $period ? [[...$period->only(['id', 'semester', 'academic_year', 'is_active']),
+                'start_date' => $period->start_date?->format('Y-m-d'),
+                'end_date' => $period->end_date?->format('Y-m-d'),
+            ]] : [],
+            'isReviewOpen' => (bool) ($period?->is_submission_open ?? false),
+            'evaluations' => $this->dashboard->officeFeed($office,$period,$request->integer('department_id') ?: null,$request->integer('program_id') ?: null,max(1,$request->integer('page',1))),
+            'filterOptions' => $this->dashboard->filterOptions(),
+            'selectedFilters' => $request->only('department_id','program_id'),
         ]);
     }
 }

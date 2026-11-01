@@ -138,7 +138,7 @@ class RoleScopingTest extends TestCase
         }
 
         $this->get(route('departments.show', $this->csDept))->assertForbidden();
-        $this->post(route('evaluations.remind-all'))->assertForbidden();
+        $this->postJson(route('evaluations.remind-all'))->assertOk(); // Authorized assigned-office reminders only.
         $this->get(route('courses.search'))->assertForbidden();
     }
 

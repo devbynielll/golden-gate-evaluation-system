@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import { startImportPolling } from './importPolling';
 import Modal from '@/Components/Modal';
 import Spinner from '@/Components/Spinner';
 
@@ -13,6 +14,7 @@ export default function BatchProgressModal({
     onDone,
 }) {
     const [status, setStatus] = useState(null);
+    const [error, setError] = useState('');
 
     useEffect(() => {
         if (!show || !batchId) {
@@ -20,31 +22,21 @@ export default function BatchProgressModal({
             return;
         }
 
-        let cancelled = false;
+        setError('');
+        return startImportPolling({fetchStatus:async()=>(await axios.get(route('import-batches.show',batchId),{timeout:15000})).data,onStatus:setStatus,onError:setError});
 
-        const tick = async () => {
-            const { data } = await axios.get(route('import-batches.show', batchId));
-            if (cancelled) return;
-            setStatus(data);
-            if (data.status !== 'completed') {
-                setTimeout(tick, 1200);
-            }
-        };
-        tick();
-
-        return () => {
-            cancelled = true;
-        };
     }, [show, batchId]);
 
     const total = status?.totalRows ?? 0;
     const processed = status?.processedRows ?? 0;
     const percent = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
-    const done = status?.status === 'completed';
+    const done = ['completed','failed'].includes(status?.status);
 
     return (
         <Modal show={show} closeable={false} maxWidth="md">
             <div className="p-6">
+                {error && <p className="text-xs text-red-600">{error}</p>}
+                {status?.message && <p className="text-xs text-red-600">{status.message}</p>}
                 <div className="flex items-center justify-center gap-3">
                     {!done && <Spinner className="h-5 w-5 text-green-600" />}
                     <p className="text-sm font-semibold text-gray-700">
