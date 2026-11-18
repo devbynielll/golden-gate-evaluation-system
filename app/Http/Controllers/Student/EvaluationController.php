@@ -29,6 +29,7 @@ class EvaluationController extends Controller
         $filters = $request->validate([
             'faculty_page' => ['nullable', 'integer', 'min:1'],
             'office_page' => ['nullable', 'integer', 'min:1'],
+            'staff_page' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $period = $this->service->activePeriod();
@@ -41,6 +42,7 @@ class EvaluationController extends Controller
 
         return Inertia::render('Student/Evaluation', [
             ...$board,
+            ...app(\App\Services\StaffEvaluationService::class)->board($student, $period, $filters['staff_page'] ?? 1),
             'isSubmissionOpen' => $period?->is_submission_open ?? false,
         ]);
     }

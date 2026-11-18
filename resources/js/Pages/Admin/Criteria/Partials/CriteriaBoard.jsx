@@ -26,10 +26,18 @@ export default function CriteriaBoard({
     totalQuestions = 0,
 }) {
     const { errors, criteriaPermissions = {}, selectedOfficeId = null, criteriaOfficeName = null } = usePage().props;
+    const officeScoped = type === 'office' || type === 'staff';
+    const mutationRoute = (action, ...ids) => route(
+        type === 'staff' ? `staff-criteria.${action}` : `criteria.${action}`,
+        type === 'staff' ? ids : [type, ...ids],
+    );
     const writesLocked = criteriaPermissions.writesLocked ?? false;
     const readOnlyCategory = (category) => (criteriaPermissions.readOnlyCategoryIds ?? []).includes(category.id);
     const categoryLocked = (category) => writesLocked || readOnlyCategory(category) || (criteriaPermissions.usedCategoryIds ?? []).includes(category.id);
     const questionLocked = (question) => writesLocked || (criteriaPermissions.usedQuestionIds ?? []).includes(question.id);
+
+    const [saving, setSaving] = useState(false);
+    const mutationOptions = (callbacks = {}) => ({ ...callbacks, onStart: () => setSaving(true), onFinish: () => { setSaving(false); callbacks.onFinish?.(); } });
 
     const [categoryModal, setCategoryModal] = useState(null); // { mode, category }
     const [pendingCategoryDeleteId, setPendingCategoryDeleteId] = useState(null);
@@ -38,35 +46,38 @@ export default function CriteriaBoard({
     const [pendingQuestionDelete, setPendingQuestionDelete] = useState(null); // { categoryId, questionId }
 
     const goToPage = (page) =>
-        router.get(route(route().current()), { page, ...(type === 'office' && selectedOfficeId !== null ? { office_id: selectedOfficeId } : {}) }, {
+        router.get(route(route().current()), { page, ...(officeScoped && selectedOfficeId !== null ? { office_id: selectedOfficeId } : {}) }, {
             preserveState: true,
             preserveScroll: true,
             only: ['categories', 'criteriaPermissions'],
         });
 
     const saveCategory = (form) => {
+        if (saving) return;
         const onSuccess = () => setCategoryModal(null);
         if (categoryModal?.mode === 'edit') {
-            router.put(route('criteria.categories.update', [type, categoryModal.category.id]), form, { onSuccess });
+            router.put(mutationRoute('categories.update', categoryModal.category.id), form, mutationOptions({ onSuccess }));
         } else {
-            router.post(route('criteria.categories.store', type), { ...form, ...(type === 'office' ? { office_id: selectedOfficeId } : {}) }, { onSuccess });
+            router.post(mutationRoute('categories.store'), { ...form, ...(officeScoped ? { office_id: selectedOfficeId } : {}) }, mutationOptions({ onSuccess }));
         }
     };
 
     const confirmCategoryDelete = () => {
-        router.delete(route('criteria.categories.destroy', [type, pendingCategoryDeleteId]), {
+        if (saving) return;
+        router.delete(mutationRoute('categories.destroy', pendingCategoryDeleteId), mutationOptions({
             onFinish: () => setPendingCategoryDeleteId(null),
-        });
+        }));
     };
 
     const saveQuestion = (form) => {
+        if (saving) return;
         const { category, mode, question } = questionModal;
         const onSuccess = () => setQuestionModal(null);
 
         if (mode === 'edit') {
-            router.put(route('criteria.questions.update', [type, category.id, question.id]), form, { onSuccess });
+            router.put(mutationRoute('questions.update', category.id, question.id), form, mutationOptions({ onSuccess }));
         } else {
-            router.post(route('criteria.questions.store', [type, category.id]), form, { onSuccess });
+            router.post(mutationRoute('questions.store', category.id), form, mutationOptions({ onSuccess }));
         }
     };
 
@@ -79,10 +90,11 @@ export default function CriteriaBoard({
     };
 
     const confirmQuestionDelete = () => {
+        if (saving) return;
         const { categoryId, questionId } = pendingQuestionDelete;
-        router.delete(route('criteria.questions.destroy', [type, categoryId, questionId]), {
+        router.delete(mutationRoute('questions.destroy', categoryId, questionId), mutationOptions({
             onFinish: () => setPendingQuestionDelete(null),
-        });
+        }));
     };
 
     const categoryList = categories.data ?? [];
@@ -103,7 +115,7 @@ export default function CriteriaBoard({
 
                     <button
                         type="button"
-                        disabled={writesLocked}
+                        disabled={writesLocked || saving}
                         onClick={() => setCategoryModal({ mode: 'add' })}
                         className="flex items-center gap-1.5 rounded-md bg-green-700 px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-white shadow-sm transition hover:bg-green-800"
                     >
@@ -112,6 +124,7 @@ export default function CriteriaBoard({
                     </button>
                 </div>
 
+                {saving && <p role="status" className="text-xs text-gray-500">Saving criteria…</p>}
                 {criteriaPermissions.notice && <p className="text-xs text-gray-500">{criteriaPermissions.notice}</p>}
                 {errors.criteria && <p className="text-xs text-red-500" role="alert">{errors.criteria}</p>}
 
@@ -133,13 +146,13 @@ export default function CriteriaBoard({
                                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-white">
                                     <LayersIcon className="h-4 w-4" />
                                     Section {category.section_number}: {category.name}
-                                    {type === 'office' && <span className="font-normal"> — {category.office_id === null ? 'Shared' : criteriaOfficeName}</span>}
+                                    {officeScoped && <span className="font-normal"> — {category.office_id === null ? 'Shared' : criteriaOfficeName}</span>}
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                     <button
                                         type="button"
                                         title="Add Question"
-                                        disabled={writesLocked || readOnlyCategory(category)}
+                                        disabled={writesLocked || saving || readOnlyCategory(category)}
                                         onClick={() =>
                                             setQuestionModal({
                                                 mode: 'add',
@@ -153,7 +166,7 @@ export default function CriteriaBoard({
                                     <button
                                         type="button"
                                         title="Edit Category"
-                                        disabled={categoryLocked(category)}
+                                        disabled={saving || categoryLocked(category)}
                                         onClick={() =>
                                             setCategoryModal({
                                                 mode: 'edit',
@@ -170,7 +183,7 @@ export default function CriteriaBoard({
                                     <button
                                         type="button"
                                         title="Delete Category"
-                                        disabled={categoryLocked(category)}
+                                        disabled={saving || categoryLocked(category)}
                                         onClick={() =>
                                             setPendingCategoryDeleteId(
                                                 category.id,
@@ -217,7 +230,7 @@ export default function CriteriaBoard({
                                                     <button
                                                         type="button"
                                                         title="Edit Question"
-                                                        disabled={readOnlyCategory(category) || questionLocked(question)}
+                                                        disabled={saving || readOnlyCategory(category) || questionLocked(question)}
                                                         onClick={() =>
                                                             setQuestionModal({
                                                                 mode: 'edit',
@@ -292,10 +305,11 @@ export default function CriteriaBoard({
             </div>
 
             <CategoryFormModal
+                processing={saving}
                 show={categoryModal !== null}
                 mode={categoryModal?.mode}
                 category={categoryModal?.category}
-                onClose={() => setCategoryModal(null)}
+                onClose={() => { if (!saving) setCategoryModal(null); }}
                 onSubmit={saveCategory}
                 errors={errors}
             />
@@ -309,11 +323,12 @@ export default function CriteriaBoard({
             />
 
             <QuestionFormModal
+                processing={saving}
                 show={questionModal !== null}
                 mode={questionModal?.mode}
                 categoryName={questionModal?.category?.name ?? ''}
                 question={questionModal?.question}
-                onClose={() => setQuestionModal(null)}
+                onClose={() => { if (!saving) setQuestionModal(null); }}
                 onSubmit={saveQuestion}
                 onDelete={askDeleteQuestion}
                 errors={errors}

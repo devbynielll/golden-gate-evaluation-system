@@ -1,4 +1,4 @@
-import { Dialog, DialogPanel, Transition, TransitionChild } from '@headlessui/react';
+import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import WarningCircleIcon from '@/Components/Icons/WarningCircleIcon';
 
 export default function ConfirmDeleteModal({
@@ -40,9 +40,9 @@ export default function ConfirmDeleteModal({
                         <div className="px-8 py-8 text-center">
                             <WarningCircleIcon className="mx-auto h-14 w-14 text-yellow-400" />
 
-                            <h2 className="mt-4 text-xl font-extrabold text-gray-900">
+                            <DialogTitle className="mt-4 text-xl font-extrabold text-gray-900">
                                 {title}
-                            </h2>
+                            </DialogTitle>
                             <p className="mt-1 text-sm text-gray-500">
                                 {description}
                             </p>

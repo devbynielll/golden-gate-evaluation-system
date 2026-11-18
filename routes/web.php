@@ -11,10 +11,13 @@ use App\Http\Controllers\Admin\FacultyController;
 use App\Http\Controllers\Admin\FacultyImportController;
 use App\Http\Controllers\Admin\ImportBatchController;
 use App\Http\Controllers\Admin\OfficeController;
+use App\Http\Controllers\Admin\OfficeStaffController;
+use App\Http\Controllers\Admin\StaffCriteriaController;
 use App\Http\Controllers\Admin\OfficeImportController;
 use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\ProgramWorkspaceController;
 use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\Admin\StaffReportController;
 use App\Http\Controllers\Admin\ReviewPeriodController;
 use App\Http\Controllers\Admin\ScheduleCopyController;
 use App\Http\Controllers\Admin\StudentController;
@@ -24,6 +27,7 @@ use App\Http\Controllers\Admin\SubjectImportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Student\EvaluationController;
+use App\Http\Controllers\Student\StaffEvaluationController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -62,6 +66,8 @@ Route::middleware(['auth', 'verified', 'role:super_admin'])->group(function () {
 
     Route::post('/admin/review-periods', [ReviewPeriodController::class, 'store'])
         ->name('review-periods.store');
+    Route::put('/admin/review-periods/{reviewPeriod}', [ReviewPeriodController::class, 'update'])
+        ->name('review-periods.update');
     Route::patch('/admin/review-periods/{reviewPeriod}/activate', [ReviewPeriodController::class, 'activate'])
         ->name('review-periods.activate');
     Route::patch('/admin/review-periods/{reviewPeriod}/toggle-submission', [ReviewPeriodController::class, 'toggleSubmission'])
@@ -133,6 +139,7 @@ Route::middleware(['auth', 'verified', 'role:super_admin,department_admin,office
 
 // super admin + the office admin
 Route::middleware(['auth', 'verified', 'role:super_admin,office_admin'])->group(function () {
+    Route::get('/admin/reports/staff', [StaffReportController::class, 'index'])->name('reports.staff');
     Route::get('/admin/reports/office', [ReportController::class, 'office'])->name('reports.office');
 });
 
@@ -140,6 +147,7 @@ Route::middleware(['auth', 'verified', 'role:student'])->group(function () {
     Route::get('/evaluation', [EvaluationController::class, 'index'])->name('evaluation.index');
     Route::post('/evaluation/faculty/{classSubject}', [EvaluationController::class, 'storeFaculty'])
         ->name('evaluation.faculty.store');
+    Route::post('/evaluation/staff/{staff}', [StaffEvaluationController::class, 'store'])->name('evaluation.staff.store');
     Route::post('/evaluation/office/{office}', [EvaluationController::class, 'storeOffice'])
         ->name('evaluation.office.store');
 });
@@ -178,4 +186,27 @@ Route::middleware(['auth', 'verified', 'role:super_admin,department_admin,office
     Route::delete('/admin/criteria/{type}/categories/{category}/questions/{question}', [CriteriaController::class, 'destroyQuestion'])
         ->name('criteria.questions.destroy');
 
+});
+
+
+Route::middleware(['auth', 'verified', 'role:super_admin,office_admin'])->group(function () {
+    Route::get('/admin/staff', [OfficeStaffController::class, 'index'])->name('staff.index');
+    Route::get('/admin/offices/{office}/staff', [OfficeStaffController::class, 'index'])->name('offices.staff.index');
+    Route::post('/admin/offices/{office}/staff', [OfficeStaffController::class, 'store'])->name('offices.staff.store');
+    Route::put('/admin/offices/{office}/staff/{staff}', [OfficeStaffController::class, 'update'])->name('offices.staff.update');
+    Route::patch('/admin/offices/{office}/staff/{staff}/archive', [OfficeStaffController::class, 'archive'])->name('offices.staff.archive');
+
+    Route::get('/admin/criteria/staff', [StaffCriteriaController::class, 'index'])->name('criteria.staff');
+    Route::post('/admin/staff-criteria/categories', [StaffCriteriaController::class, 'storeStaffCategory'])->name('staff-criteria.categories.store');
+    Route::put('/admin/staff-criteria/categories/{staffCategory}', [StaffCriteriaController::class, 'updateStaffCategory'])->name('staff-criteria.categories.update');
+    Route::delete('/admin/staff-criteria/categories/{staffCategory}', [StaffCriteriaController::class, 'destroyStaffCategory'])->name('staff-criteria.categories.destroy');
+    Route::post('/admin/staff-criteria/categories/{staffCategory}/questions', [StaffCriteriaController::class, 'storeStaffQuestion'])->name('staff-criteria.questions.store');
+    Route::put('/admin/staff-criteria/categories/{staffCategory}/questions/{staffQuestion}', [StaffCriteriaController::class, 'updateStaffQuestion'])->name('staff-criteria.questions.update');
+    Route::delete('/admin/staff-criteria/categories/{staffCategory}/questions/{staffQuestion}', [StaffCriteriaController::class, 'destroyStaffQuestion'])->name('staff-criteria.questions.destroy');
+});
+
+Route::middleware(['auth', 'verified', 'role:super_admin,department_admin,office_admin'])->group(function () {
+    Route::get('/admin/notifications', [\App\Http\Controllers\Admin\EvaluationNotificationController::class, 'index'])->name('admin-notifications.index');
+    Route::patch('/admin/notifications/{notification}', [\App\Http\Controllers\Admin\EvaluationNotificationController::class, 'update'])
+        ->whereUuid('notification')->name('admin-notifications.update');
 });

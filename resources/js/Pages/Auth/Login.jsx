@@ -1,4 +1,5 @@
 import InputError from '@/Components/InputError';
+import EyeIcon from '@/Components/Icons/EyeIcon';
 import ShieldCheckIcon from '@/Components/ShieldCheckIcon';
 import EvaluationGuestLayout from '@/Layouts/EvaluationGuestLayout';
 import ForgotPasswordModal from '@/Pages/Auth/Partials/ForgotPasswordModal';
@@ -8,6 +9,7 @@ import { useState } from 'react';
 
 export default function Login({ status, canResetPassword }) {
     const [showForgotPassword, setShowForgotPassword] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     const { data, setData, post, processing, errors, reset } = useForm({
         id_number: '',
@@ -84,16 +86,27 @@ export default function Login({ status, canResetPassword }) {
                             Password
                         </label>
 
-                        <input
-                            id="password"
-                            type="password"
-                            name="password"
-                            value={data.password}
-                            className="mt-1 block w-full rounded-md border-none bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm placeholder:text-gray-400 focus:ring-2 focus:ring-green-600"
-                            placeholder="Enter your your password"
-                            autoComplete="current-password"
-                            onChange={(e) => setData('password', e.target.value)}
-                        />
+                        <div className="relative mt-1">
+                            <input
+                                id="password"
+                                type={showPassword ? 'text' : 'password'}
+                                name="password"
+                                value={data.password}
+                                className="block w-full rounded-md border-none bg-white py-2.5 pl-4 pr-12 text-sm text-gray-800 shadow-sm placeholder:text-gray-400 focus:ring-2 focus:ring-green-600"
+                                placeholder="Enter your your password"
+                                autoComplete="current-password"
+                                onChange={(e) => setData('password', e.target.value)}
+                            />
+                            <button
+                                type="button"
+                                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                aria-controls="password"
+                                onClick={() => setShowPassword((visible) => !visible)}
+                                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-md text-gray-500 hover:text-green-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
+                            >
+                                <EyeIcon off={showPassword} />
+                            </button>
+                        </div>
 
                         <InputError message={errors.password} className="mt-2" />
                     </div>

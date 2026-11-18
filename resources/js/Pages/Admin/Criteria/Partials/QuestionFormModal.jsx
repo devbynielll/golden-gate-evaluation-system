@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DialogTitle } from '@headlessui/react';
 import XIcon from '@/Components/Icons/XIcon';
 import Modal from '@/Components/Modal';
 
@@ -14,6 +15,7 @@ export default function QuestionFormModal({
     onSubmit,
     onDelete,
     errors = {},
+    processing = false,
 }) {
     const [form, setForm] = useState(EMPTY_FORM);
     const isEdit = mode === 'edit';
@@ -26,6 +28,7 @@ export default function QuestionFormModal({
 
     const submit = (e) => {
         e.preventDefault();
+        if (processing) return;
         if (!form.text) return;
         onSubmit(form);
     };
@@ -34,35 +37,43 @@ export default function QuestionFormModal({
         <Modal show={show} onClose={onClose} maxWidth="md">
             <div className="p-6">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-extrabold uppercase tracking-wide text-green-700">
+                    <DialogTitle className="text-lg font-extrabold uppercase tracking-wide text-green-700">
                         {isEdit ? 'Edit Question' : 'Add Question'}
-                    </h2>
+                    </DialogTitle>
                     <button
                         type="button"
                         onClick={onClose}
+                        disabled={processing}
+                        aria-label="Close question form"
                         className="text-gray-400 transition hover:text-gray-600"
                     >
                         <XIcon className="h-5 w-5" />
                     </button>
                 </div>
 
-                <form onSubmit={submit} className="mt-4">
+                <form onSubmit={submit} className="mt-4" aria-busy={processing}>
                     <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                        <label className="block text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                        <label htmlFor="criteria-question-category" className="block text-[10px] font-bold uppercase tracking-wide text-gray-400">
                             Category Name
                         </label>
                         <input
                             type="text"
+                            id="criteria-question-category"
                             value={categoryName}
                             disabled
                             className="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 text-sm text-gray-500 shadow-sm"
                         />
 
-                        <label className="mt-4 block text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                        <label htmlFor="criteria-question-text" className="mt-4 block text-[10px] font-bold uppercase tracking-wide text-gray-400">
                             Question
                         </label>
                         <input
                             type="text"
+                            id="criteria-question-text"
+                            aria-label="Question"
+                            disabled={processing}
+                            aria-invalid={Boolean(errors.text)}
+                            aria-describedby={errors.text ? 'criteria-text-error' : undefined}
                             value={form.text}
                             onChange={(e) =>
                                 setForm({ text: e.target.value })
@@ -71,12 +82,13 @@ export default function QuestionFormModal({
                             autoFocus
                             className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm placeholder:text-gray-400 focus:border-green-600 focus:ring-green-600"
                         />
-                        {errors.text && <p className="mt-1 text-xs text-red-500">{errors.text}</p>}
+                        {errors.text && <p id="criteria-text-error" role="alert" className="mt-1 text-xs text-red-500">{errors.text}</p>}
                     </div>
 
                     <div className="mt-5 flex justify-center gap-3">
                         <button
                             type="submit"
+                            disabled={processing}
                             className="rounded-md bg-green-700 px-8 py-2.5 text-sm font-bold uppercase tracking-wide text-white shadow-sm transition hover:bg-green-800"
                         >
                             {isEdit ? 'Update' : 'Save'}
@@ -85,6 +97,7 @@ export default function QuestionFormModal({
                             <button
                                 type="button"
                                 onClick={onDelete}
+                                disabled={processing}
                                 className="rounded-md bg-red-100 px-8 py-2.5 text-sm font-bold uppercase tracking-wide text-red-500 shadow-sm transition hover:bg-red-200"
                             >
                                 Delete

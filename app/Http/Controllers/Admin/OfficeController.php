@@ -78,6 +78,9 @@ class OfficeController extends Controller
                 'office' => 'This office has office-specific evaluation criteria and cannot be deleted. Preserve those criteria and their history first.',
             ]);
         }
+        if ($office->staff()->exists() || \App\Models\StaffCriteriaCategory::where('office_id', $office->id)->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['office' => 'This office has staff or staff criteria. Preserve its historical references instead of deleting it.']);
+        }
         $office->delete();
         Cache::flush();
 

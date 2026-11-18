@@ -178,18 +178,17 @@ class DepartmentCriteriaAccessTest extends TestCase
         $this->assertDatabaseHas('criteria_questions', ['id' => $this->officeQuestion->id]);
     }
 
-    public function test_super_admin_retains_faculty_policy_and_office_period_protections(): void
+    public function test_super_admin_obeys_faculty_history_and_office_period_protections(): void
     {
         $this->usedQuestion();
         $this->period->update(['is_submission_open' => true]);
         $this->actingAs(User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]));
         foreach (['criteria.faculty', 'criteria.office'] as $route) {
             $props = $this->get(route($route))->assertOk()->viewData('page')['props'];
-            if ($route === 'criteria.faculty') $this->assertSame([], $props['criteriaPermissions']);
-            else $this->assertTrue($props['criteriaPermissions']['writesLocked']);
+            $this->assertTrue($props['criteriaPermissions']['writesLocked']);
         }
-        $this->put($this->questionUrl(), ['text' => 'Existing Super policy'])->assertRedirect()->assertSessionHasNoErrors();
-        $this->assertSame('Existing Super policy', $this->question->fresh()->text);
+        $this->put($this->questionUrl(), ['text' => 'Blocked historical rewrite'])->assertSessionHasErrors('criteria');
+        $this->assertSame('Explains clearly', $this->question->fresh()->text);
         $this->post('/admin/criteria/office/categories', ['name' => 'Office extra', 'section' => 2])->assertSessionHasErrors('criteria');
         $this->period->update(['is_submission_open' => false]);
         $this->post('/admin/criteria/office/categories', ['name' => 'Office extra', 'section' => 2])->assertRedirect()->assertSessionHasNoErrors();
@@ -269,6 +268,7 @@ class DepartmentCriteriaAccessTest extends TestCase
         $this->assertContains($this->question->id, $props['criteriaPermissions']['usedQuestionIds']);
         $this->assertContains($this->category->id, $props['criteriaPermissions']['usedCategoryIds']);
         $props = $this->actingAs($super)->get(route('criteria.faculty'))->assertOk()->viewData('page')['props'];
-        $this->assertSame([], $props['criteriaPermissions']);
+        $this->assertContains($this->question->id, $props['criteriaPermissions']['usedQuestionIds']);
+        $this->assertContains($this->category->id, $props['criteriaPermissions']['usedCategoryIds']);
     }
 }

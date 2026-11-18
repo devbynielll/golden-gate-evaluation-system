@@ -144,6 +144,10 @@ class StudentController extends Controller
 
         // removing the roster entry also revokes their login
         DB::transaction(function () use ($student) {
+            $student = Student::whereKey($student->id)->lockForUpdate()->firstOrFail();
+            if ($student->evaluations()->exists() || \App\Models\StaffEvaluation::where('student_id', $student->id)->exists()) {
+                throw ValidationException::withMessages(['student' => 'This student has evaluation history and cannot be deleted. Preserve the roster record.']);
+            }
             $user = $student->user;
             $student->delete();
             $user?->delete();

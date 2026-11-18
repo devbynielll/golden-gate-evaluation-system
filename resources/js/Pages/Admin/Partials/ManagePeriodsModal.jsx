@@ -3,6 +3,7 @@ import { router, useForm } from '@inertiajs/react';
 import CalendarIcon from '@/Components/Icons/CalendarIcon';
 import InboxIcon from '@/Components/Icons/InboxIcon';
 import PlusIcon from '@/Components/Icons/PlusIcon';
+import PencilIcon from '@/Components/Icons/PencilIcon';
 import TrashIcon from '@/Components/Icons/TrashIcon';
 import XIcon from '@/Components/Icons/XIcon';
 import ConfirmDeleteModal from '@/Components/ConfirmDeleteModal';
@@ -35,18 +36,63 @@ const formatDuration = (start, end) => {
 
 // manage periods + set active modal
 export default function ManagePeriodsModal({ show, onClose, periods = [] }) {
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, post, put, processing, errors, reset, clearErrors } = useForm({
         academic_year: '',
         semester: '',
         start_date: '',
         end_date: '',
     });
     const [pendingDeleteId, setPendingDeleteId] = useState(null);
+    const [editingPeriod, setEditingPeriod] = useState(null);
+    const [confirmingSave, setConfirmingSave] = useState(false);
+    const identityLocked = Boolean(editingPeriod?.evaluations_exists || editingPeriod?.staff_evaluations_exists);
+    const currentYear = new Date().getFullYear();
+    // Roll forward automatically and retain exact historical labels without rewriting them.
+    const academicYears = [...new Set([
+        ...Array.from({ length: 8 }, (_, index) => {
+            const year = currentYear - 2 + index;
+            return `${year}-${year + 1}`;
+        }),
+        ...periods.map((period) => period.academic_year).filter(Boolean),
+    ])].sort();
 
     const setField = (field) => (e) => setData(field, e.target.value);
 
+    const cancelEdit = () => {
+        setEditingPeriod(null);
+        setConfirmingSave(false);
+        reset();
+        clearErrors();
+    };
+
+    const editPeriod = (period) => {
+        if (processing) return;
+        clearErrors();
+        setEditingPeriod(period);
+        setData({
+            academic_year: period.academic_year,
+            semester: period.semester,
+            start_date: period.start_date?.slice(0, 10) ?? '',
+            end_date: period.end_date?.slice(0, 10) ?? '',
+        });
+    };
+
+    const saveChanges = () => {
+        if (processing) return;
+        setConfirmingSave(false);
+        put(route('review-periods.update', editingPeriod.id), {
+            preserveScroll: true,
+            onSuccess: cancelEdit,
+        });
+    };
+
     const addPeriod = (e) => {
         e.preventDefault();
+        if (processing) return;
+        if (editingPeriod) {
+            setConfirmingSave(true);
+            return;
+        }
         post(route('review-periods.store'), {
             preserveScroll: true,
             onSuccess: () => reset(),
@@ -65,7 +111,8 @@ export default function ManagePeriodsModal({ show, onClose, periods = [] }) {
     };
 
     const close = () => {
-        reset();
+        if (processing) return;
+        cancelEdit();
         onClose();
     };
 
@@ -87,24 +134,35 @@ export default function ManagePeriodsModal({ show, onClose, periods = [] }) {
 
                 <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
                     <p className="text-xs font-extrabold uppercase tracking-wide text-green-700">
-                        Create New Period
+                        {editingPeriod ? 'Edit Review Period' : 'Create New Period'}
                     </p>
+                    {editingPeriod && (
+                        <p className="mt-2 text-xs text-gray-600">
+                            {identityLocked && 'Academic Year and Semester are locked because this period has linked evaluations. '}
+                            Date changes do not open or close evaluations. Reopening remains a separate action.
+                        </p>
+                    )}
 
                     <form
                         onSubmit={addPeriod}
                         className="mt-3 grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-[1.2fr_1fr_1fr_1fr_auto]"
                     >
                         <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                            <label htmlFor="academic_year" className="block text-[10px] font-bold uppercase tracking-wide text-gray-400">
                                 Academic Year
                             </label>
-                            <input
-                                type="text"
+                            <select
+                                id="academic_year"
+                                disabled={identityLocked || processing}
                                 value={data.academic_year}
                                 onChange={setField('academic_year')}
-                                placeholder="e.g. 2026 - 2027"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm placeholder:text-gray-400 focus:border-green-600 focus:ring-green-600"
-                            />
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm text-gray-600 shadow-sm focus:border-green-600 focus:ring-green-600"
+                            >
+                                <option value="">Choose Academic Year</option>
+                                {academicYears.map((year) => (
+                                    <option key={year} value={year}>{year}</option>
+                                ))}
+                            </select>
                             {errors.academic_year && (
                                 <p className="mt-1 text-xs text-red-500">{errors.academic_year}</p>
                             )}
@@ -115,6 +173,8 @@ export default function ManagePeriodsModal({ show, onClose, periods = [] }) {
                                 Semester
                             </label>
                             <select
+                                aria-label="Semester"
+                                disabled={identityLocked || processing}
                                 value={data.semester}
                                 onChange={setField('semester')}
                                 className="mt-1 block w-full rounded-md border-gray-300 text-sm text-gray-600 shadow-sm focus:border-green-600 focus:ring-green-600"
@@ -140,6 +200,8 @@ export default function ManagePeriodsModal({ show, onClose, periods = [] }) {
                             <div className="relative mt-1">
                                 <input
                                     type="date"
+                                    aria-label="Start Date"
+                                    disabled={processing}
                                     value={data.start_date}
                                     onChange={setField('start_date')}
                                     className="block w-full rounded-md border-gray-300 py-2 pl-3 pr-9 text-sm text-gray-600 shadow-sm focus:border-green-600 focus:ring-green-600"
@@ -158,6 +220,8 @@ export default function ManagePeriodsModal({ show, onClose, periods = [] }) {
                             <div className="relative mt-1">
                                 <input
                                     type="date"
+                                    aria-label="End Date"
+                                    disabled={processing}
                                     value={data.end_date}
                                     onChange={setField('end_date')}
                                     className="block w-full rounded-md border-gray-300 py-2 pl-3 pr-9 text-sm text-gray-600 shadow-sm focus:border-green-600 focus:ring-green-600"
@@ -174,10 +238,16 @@ export default function ManagePeriodsModal({ show, onClose, periods = [] }) {
                             disabled={processing}
                             className="flex items-center justify-center gap-1.5 rounded-md bg-green-700 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-sm transition hover:bg-green-800 disabled:opacity-60"
                         >
-                            <PlusIcon className="h-3.5 w-3.5" />
-                            Add
+                            {editingPeriod ? <PencilIcon className="h-3.5 w-3.5" /> : <PlusIcon className="h-3.5 w-3.5" />}
+                            {editingPeriod ? 'Save' : 'Add'}
                         </button>
                     </form>
+                    {editingPeriod && (
+                        <button type="button" disabled={processing} onClick={cancelEdit}
+                            className="mt-3 text-xs font-semibold text-gray-500 hover:text-gray-800 disabled:opacity-50">
+                            Cancel editing
+                        </button>
+                    )}
                 </div>
 
                 <div className="mt-5 overflow-x-auto">
@@ -213,7 +283,7 @@ export default function ManagePeriodsModal({ show, onClose, periods = [] }) {
                                         key={period.id}
                                         className="border-b border-gray-100"
                                     >
-                                        <td className="py-3 text-sm">
+                                        <td className="whitespace-nowrap py-3 text-sm">
                                             <span className="font-bold text-gray-800">
                                                 {period.semester}
                                             </span>{' '}
@@ -221,7 +291,7 @@ export default function ManagePeriodsModal({ show, onClose, periods = [] }) {
                                                 {period.academic_year}
                                             </span>
                                         </td>
-                                        <td className="py-3 text-sm text-gray-500">
+                                        <td className="whitespace-nowrap py-3 text-sm text-gray-500">
                                             {formatDuration(period.start_date, period.end_date)}
                                         </td>
                                         <td className="py-3">
@@ -233,25 +303,33 @@ export default function ManagePeriodsModal({ show, onClose, periods = [] }) {
                                                 <button
                                                     type="button"
                                                     onClick={() => setActive(period.id)}
-                                                    className="rounded-full border border-green-600 px-3 py-1 text-xs font-bold uppercase tracking-wide text-green-700 transition hover:bg-green-50"
+                                                    className="whitespace-nowrap rounded-full border border-green-600 px-3 py-1 text-xs font-bold uppercase tracking-wide text-green-700 transition hover:bg-green-50"
                                                 >
                                                     Set Active
                                                 </button>
                                             )}
                                         </td>
                                         <td className="py-3">
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    setPendingDeleteId(
-                                                        period.id,
-                                                    )
-                                                }
-                                                className="text-gray-400 transition hover:text-red-500"
-                                                aria-label="Remove period"
-                                            >
-                                                <TrashIcon className="h-4 w-4" />
-                                            </button>
+                                            <div className="flex items-center gap-3">
+                                                <button type="button" disabled={processing} onClick={() => editPeriod(period)}
+                                                    className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 hover:text-green-800 disabled:opacity-50"
+                                                    aria-label={`Edit ${period.academic_year} ${period.semester}`}>
+                                                    <PencilIcon className="h-4 w-4" />
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setPendingDeleteId(
+                                                            period.id,
+                                                        )
+                                                    }
+                                                    className="text-gray-400 transition hover:text-red-500"
+                                                    aria-label="Remove period"
+                                                >
+                                                    <TrashIcon className="h-4 w-4" />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -261,6 +339,14 @@ export default function ManagePeriodsModal({ show, onClose, periods = [] }) {
                 </div>
             </div>
 
+            <ConfirmDeleteModal
+                show={confirmingSave}
+                title="Save period changes?"
+                description={editingPeriod ? `Change ${editingPeriod.academic_year} ${editingPeriod.semester} (${editingPeriod.start_date?.slice(0, 10)} to ${editingPeriod.end_date?.slice(0, 10)}) to ${data.academic_year} ${data.semester} (${data.start_date} to ${data.end_date})? Submission status will not change. Closed evaluations stay closed.` : ''}
+                confirmLabel="Save changes"
+                onCancel={() => setConfirmingSave(false)}
+                onConfirm={saveChanges}
+            />
             <ConfirmDeleteModal
                 show={pendingDeleteId !== null}
                 title="Delete Period?"

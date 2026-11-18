@@ -1,3 +1,5 @@
+> **Post-defense client testing:** On `feature/ggc-post-defense-revisions`, follow [Client Local Testing](docs/CLIENT_LOCAL_TESTING.md) for the complete disposable localhost setup and generated synthetic accounts. This is not a production deployment.
+
 # Golden Gate Colleges | Monitoring & Evaluation System
 
 A web-based platform for managing **faculty and office evaluations** at **Golden Gate Colleges (GGC)**. It supports structured evaluation periods, role-based administration, student participation, and reporting while maintaining the application's established anonymous-evaluation workflow.

@@ -5,7 +5,8 @@ import InboxIcon from '@/Components/Icons/InboxIcon';
 import Pagination from '@/Components/Pagination';
 import { router } from '@inertiajs/react';
 import ReportFilterBar from './ReportFilterBar';
-import downloadReport from './downloadReport';
+import ReportViewer from './ReportViewer';
+import useReport from './useReport';
 
 // faculty performance summary + filters
 export default function FacultyPerformanceCard({
@@ -17,8 +18,7 @@ export default function FacultyPerformanceCard({
     const [department, setDepartment] = useState(selected.department_id ?? '');
     const [periodId, setPeriodId] = useState(selected.period_id ?? null);
 
-    const reviewPeriodLabel = () =>
-        periods.find((p) => String(p.id) === String(periodId))?.label ?? 'All Semesters';
+    const report = useReport('reports.faculty', selected);
 
     const visit = (params) =>
         router.get(route('reports.faculty'), params, {
@@ -67,23 +67,21 @@ export default function FacultyPerformanceCard({
             </ReportFilterBar>
 
             <div className="overflow-hidden rounded-xl bg-white shadow-sm">
-                <div className="flex items-center justify-between gap-3 bg-green-700 px-5 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-green-700 px-5 py-3">
                     <span className="text-xs font-bold uppercase tracking-wide text-white">
                         Faculty Performance Summary
                     </span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded-full bg-white/20 px-3 py-1 text-[11px] font-bold text-white">
                             {faculty.meta?.total ?? rows.length} Faculty Member{(faculty.meta?.total ?? rows.length) === 1 ? '' : 's'}
                         </span>
+                        <button type="button" onClick={() => report.open()}
+                            className="rounded-full bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-green-700 hover:bg-green-50">
+                            View Summary
+                        </button>
                         <button
                             type="button"
-                            onClick={() =>
-                                downloadReport({
-                                    subject: 'Faculty',
-                                    reviewPeriod: reviewPeriodLabel(),
-                                    summaryRows: rows,
-                                })
-                            }
+                            onClick={() => report.open(null, true)}
                             className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-green-700 shadow-sm transition hover:bg-green-50"
                         >
                             <DocumentIcon className="h-3.5 w-3.5" />
@@ -158,16 +156,15 @@ export default function FacultyPerformanceCard({
                                                 {row.status}
                                             </span>
                                         </td>
-                                        <td className="px-5 py-3 text-right">
+                                        <td className="whitespace-nowrap px-5 py-3 text-right">
+                                            <button type="button" onClick={() => report.open(row.id)}
+                                                aria-label={`View report for ${row.name}`}
+                                                className="mr-2 inline-flex rounded-md border border-green-700 px-3 py-1.5 text-xs font-bold text-green-700 hover:bg-green-50">
+                                                View
+                                            </button>
                                             <button
                                                 type="button"
-                                                onClick={() =>
-                                                    downloadReport({
-                                                        subject: 'Faculty',
-                                                        reviewPeriod: reviewPeriodLabel(),
-                                                        detail: row,
-                                                    })
-                                                }
+                                                onClick={() => report.open(row.id, true)}
                                                 className="inline-flex items-center gap-1.5 rounded-md bg-green-700 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-green-800"
                                             >
                                                 <DownloadIcon className="h-3.5 w-3.5" />
@@ -187,6 +184,8 @@ export default function FacultyPerformanceCard({
                     onPageChange={goToPage}
                 />
             </div>
+            <ReportViewer show={report.show} loading={report.loading} error={report.error} report={report.report}
+                onClose={report.close} onDownload={report.downloadCurrent} />
         </div>
     );
 }

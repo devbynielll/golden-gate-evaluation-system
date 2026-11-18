@@ -10,6 +10,8 @@ use App\Models\Program;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 
 class FacultyController extends Controller
@@ -63,8 +65,17 @@ class FacultyController extends Controller
         $this->ensureProgramBelongsToDepartment($department, $program);
         abort_unless($faculty->program_id === $program->id, 404);
 
-        $this->deletePhoto($faculty->photo_path);
-        $faculty->delete();
+        DB::transaction(function () use ($faculty) {
+            // Match submission/assignment lock ordering before checking all periods.
+            \App\Models\ReviewPeriod::orderBy('id')->lockForUpdate()->get();
+            $record = Faculty::whereKey($faculty->id)->lockForUpdate()->firstOrFail();
+            if ($record->classSubjects()->whereHas('evaluations')->exists()) {
+                throw ValidationException::withMessages(['faculty' => 'This faculty member has evaluation history and cannot be deleted. Preserve the faculty record.']);
+            }
+            // Perform no destructive file operation before history validation succeeds.
+            $this->deletePhoto($record->photo_path);
+            $record->delete();
+        }, 3);
 
         return back()->with('status', 'Faculty removed.');
     }

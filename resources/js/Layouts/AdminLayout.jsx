@@ -7,6 +7,7 @@ import ChevronDownIcon from '@/Components/Icons/ChevronDownIcon';
 import HomeIcon from '@/Components/Icons/HomeIcon';
 import LogoutIcon from '@/Components/Icons/LogoutIcon';
 import FlashStatus from '@/Components/FlashStatus';
+import EvaluationNotifications from '@/Components/EvaluationNotifications';
 import logo from '@/Assets/logo.png';
 import UserIcon from '@/Components/Icons/UserIcon';
 import { Link, usePage } from '@inertiajs/react';
@@ -25,9 +26,9 @@ export default function AdminLayout({ children }) {
     const isOfficeAdmin = role === 'office_admin';
 
     const criteriaActive =
-        route().current('criteria.faculty') || route().current('criteria.office');
+        route().current('criteria.faculty') || route().current('criteria.office') || route().current('criteria.staff');
     const reportsActive =
-        route().current('reports.faculty') || route().current('reports.office');
+        route().current('reports.faculty') || route().current('reports.office') || route().current('reports.staff');
 
     const navItems = [
         {
@@ -49,8 +50,9 @@ export default function AdminLayout({ children }) {
             label: 'Offices',
             icon: BriefcaseIcon,
             href: route('offices.index'),
-            active: route().current('offices.index'),
+            active: route().current('offices.index') || route().current('offices.staff.index'),
         },
+        isOfficeAdmin && { label: 'Staff', icon: UserIcon, href: route('staff.index'), active: route().current('staff.index') || route().current('offices.staff.index') },
         isSuper && {
             label: 'Accounts',
             icon: UserIcon,
@@ -62,6 +64,7 @@ export default function AdminLayout({ children }) {
     const reportItems = [
         (isSuper || isDepartmentAdmin) && { label: 'Faculty', href: route('reports.faculty') },
         (isSuper || isOfficeAdmin) && { label: 'Offices', href: route('reports.office') },
+        (isSuper || isOfficeAdmin) && { label: 'Staff', href: route('reports.staff') },
     ].filter(Boolean);
 
     return (
@@ -85,7 +88,8 @@ export default function AdminLayout({ children }) {
                         </div>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-4">
+                    <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+                        <EvaluationNotifications />
                         <span className="hidden text-xs font-bold uppercase tracking-wide text-white sm:inline">
                             {ROLE_LABELS[role] ?? 'Administrator'}
                         </span>
@@ -130,9 +134,15 @@ export default function AdminLayout({ children }) {
                     )}
 
                     {isOfficeAdmin && (
-                        <Link href={route('criteria.office')} className={'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition ' + (criteriaActive ? 'bg-green-100 text-green-700' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700')}>
+                        <Link href={route('criteria.office')} className={'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition ' + (route().current('criteria.office') ? 'bg-green-100 text-green-700' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700')}>
                             <ChecklistIcon className="h-4 w-4" />
                             Office Criteria
+                        </Link>
+                    )}
+
+                    {isOfficeAdmin && (
+                        <Link href={route('criteria.staff')} className={'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition ' + (route().current('criteria.staff') ? 'bg-green-100 text-green-700' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700')}>
+                            <ChecklistIcon className="h-4 w-4" />Staff Criteria
                         </Link>
                     )}
 
@@ -166,6 +176,9 @@ export default function AdminLayout({ children }) {
                                 >
                                     Offices
                                 </Link>
+                            </MenuItem>
+                            <MenuItem>
+                                <Link href={route('criteria.staff')} className="block px-4 py-2 text-xs font-bold uppercase tracking-wide text-gray-600 data-[focus]:bg-gray-100">Office Staff</Link>
                             </MenuItem>
                         </MenuItems>
                     </Menu>

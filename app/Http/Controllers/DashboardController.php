@@ -77,7 +77,10 @@ class DashboardController extends Controller
                 'department_id' => $departmentId,
                 'program_id' => $programId,
             ],
-            'periods' => ReviewPeriod::orderByDesc('start_date')->get(),
+            'periods' => ReviewPeriod::withExists(['evaluations', 'staffEvaluations'])->orderByDesc('start_date')->get()->each(function ($period) {
+                $period->evaluations_exists = $period->evaluations_exists || $period->staff_evaluations_exists;
+                $period->makeHidden('staff_evaluations_exists');
+            }),
             'canManagePeriods' => $user->isSuperAdmin(),
         ]);
     }

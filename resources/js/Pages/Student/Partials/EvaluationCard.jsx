@@ -10,15 +10,18 @@ export default function EvaluationCard({
     subtitle,
     onClick,
     completed = false,
+    disabled = false,
+    disabledLabel = 'Not available',
 }) {
     return (
         <button
             type="button"
-            onClick={completed ? undefined : onClick}
-            aria-disabled={completed}
+            onClick={completed || disabled ? undefined : onClick}
+            disabled={disabled && !completed}
+            aria-disabled={completed || disabled}
             className={
                 'block w-full max-w-sm overflow-hidden rounded-lg text-left shadow-sm transition ' +
-                (completed ? 'cursor-default' : 'hover:shadow-md')
+                (completed || disabled ? 'cursor-default' : 'hover:shadow-md')
             }
         >
             <div
@@ -35,7 +38,7 @@ export default function EvaluationCard({
                 ) : (
                     <span className="relative inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide text-green-700 shadow-sm">
                         <PencilIcon className="h-3.5 w-3.5" />
-                        Start Evaluating
+                        {disabled ? disabledLabel : 'Start Evaluating'}
                     </span>
                 )}
             </div>

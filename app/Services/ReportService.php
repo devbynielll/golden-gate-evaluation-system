@@ -35,28 +35,30 @@ class ReportService
         ]);
     }
 
-    public function facultyReport(?int $departmentId, ?int $periodId, int $page): array
+    public function facultyReport(?int $departmentId, ?int $periodId, int $page, bool $all = false, ?int $targetId = null): array
     {
-        $cacheKey = "admin-reports-faculty:{$departmentId}:{$periodId}:{$page}";
+        $cacheKey = "admin-reports-faculty-v2:{$departmentId}:{$periodId}:{$page}:{$all}:{$targetId}";
 
-        return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($departmentId, $periodId, $page) {
-            $paginator = Faculty::query()
+        return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($departmentId, $periodId, $page, $all, $targetId) {
+            $query = Faculty::query()
                 ->with('program.department')
                 ->when($departmentId, fn ($q) => $q->whereHas(
                     'program',
                     fn ($p) => $p->where('department_id', $departmentId),
                 ))
-                ->orderBy('name')
-                ->paginate(self::PER_PAGE, page: $page);
+                ->when($targetId !== null, fn ($q) => $q->whereKey($targetId))
+                ->orderBy('name')->orderBy('id');
+            $paginator = $all ? null : $query->paginate(self::PER_PAGE, page: $page);
+            $models = $all ? $query->get() : $paginator->getCollection();
 
-            $facultyIds = $paginator->getCollection()->pluck('id');
+            $facultyIds = $models->pluck('id');
             $classSubjectsByFaculty = ClassSubject::whereIn('faculty_id', $facultyIds)
                 ->get()
                 ->groupBy('faculty_id');
 
-            $rows = $paginator->getCollection()->map(function (Faculty $faculty) use ($classSubjectsByFaculty, $periodId) {
+            $rows = $models->map(function (Faculty $faculty) use ($classSubjectsByFaculty, $periodId, $targetId) {
                 $classSubjectIds = ($classSubjectsByFaculty->get($faculty->id) ?? collect())->pluck('id');
-                $stats = $this->stats($classSubjectIds, 'class_subject_id', $periodId);
+                $stats = $this->stats($classSubjectIds, 'class_subject_id', $periodId, $targetId !== null);
 
                 return [
                     'id' => $faculty->id,
@@ -67,28 +69,30 @@ class ReportService
                 ];
             })->values();
 
-            return ['data' => $rows, 'meta' => $this->meta($paginator)];
+            return ['data' => $rows, 'meta' => $paginator ? $this->meta($paginator) : ['current_page' => 1, 'last_page' => 1, 'total' => $rows->count()]];
         });
     }
 
-    public function officeReport(?string $search, ?int $periodId, int $page, ?int $officeId = null): array
+    public function officeReport(?string $search, ?int $periodId, int $page, ?int $officeId = null, bool $all = false, ?int $targetId = null): array
     {
-        $cacheKey = 'admin-reports-office:'.($officeId ?? 'all').':'.($search ?? 'all').":{$periodId}:{$page}";
+        $cacheKey = 'admin-reports-office-v2:'.hash('sha256', json_encode([$officeId, $search, $periodId, $page, $all, $targetId]));
 
-        return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($search, $periodId, $page, $officeId) {
-            $paginator = Office::query()
+        return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($search, $periodId, $page, $officeId, $all, $targetId) {
+            $query = Office::query()
                 ->when($officeId !== null, fn ($q) => $q->whereKey($officeId))
                 ->when($search, fn ($q) => $q->where('name', 'like', "%{$search}%"))
-                ->orderBy('name')
-                ->paginate(self::PER_PAGE, page: $page);
+                ->when($targetId !== null, fn ($q) => $q->whereKey($targetId))
+                ->orderBy('name')->orderBy('id');
+            $paginator = $all ? null : $query->paginate(self::PER_PAGE, page: $page);
+            $models = $all ? $query->get() : $paginator->getCollection();
 
-            $rows = $paginator->getCollection()->map(function (Office $office) use ($periodId) {
-                $stats = $this->stats(collect([$office->id]), 'office_id', $periodId);
+            $rows = $models->map(function (Office $office) use ($periodId, $targetId) {
+                $stats = $this->stats(collect([$office->id]), 'office_id', $periodId, $targetId !== null);
 
-                return ['id' => $office->id, 'name' => $office->name, ...$stats];
+                return ['id' => $office->id, 'name' => $office->name, 'officeCode' => $office->code, ...$stats];
             })->values();
 
-            return ['data' => $rows, 'meta' => $this->meta($paginator)];
+            return ['data' => $rows, 'meta' => $paginator ? $this->meta($paginator) : ['current_page' => 1, 'last_page' => 1, 'total' => $rows->count()]];
         });
     }
 
@@ -136,12 +140,12 @@ class ReportService
     }
 
     // average rating, response count, status, and feedback for a set of evaluation targets
-    private function stats($targetIds, string $column, ?int $periodId): array
+    private function stats($targetIds, string $column, ?int $periodId, bool $withSections = false): array
     {
         $evaluations = Evaluation::whereIn($column, $targetIds)
             ->whereNotNull('submitted_at')
             ->when($periodId, fn ($q) => $q->where('review_period_id', $periodId))
-            ->with('answers')
+            ->with($withSections ? 'answers.question.category' : 'answers')
             ->get();
 
         $ratings = $evaluations->flatMap->answers->pluck('rating');
@@ -153,11 +157,30 @@ class ReportService
             'responses' => $evaluations->count(),
             'status' => $this->statusFor($avg),
             'feedback' => Str::limit($feedback, 1000),
+            ...($withSections ? ['sections' => $this->sections($evaluations->flatMap->answers)] : []),
         ];
     }
 
+    // Only answered historical sections contribute; unanswered questions are never zero-filled.
+    private function sections($answers): array
+    {
+        return $answers->filter(fn ($answer) => $answer->question?->category)
+            ->groupBy(fn ($answer) => $answer->question->category->id)
+            ->map(function ($items) {
+                $category = $items->first()->question->category;
+
+                return [
+                    'id' => $category->id,
+                    'section' => $category->section_number,
+                    'label' => "Section {$category->section_number}: {$category->name}".($category->office_id ? ' (Office-specific)' : ''),
+                    'rating' => round($items->avg('rating'), 2),
+                    'answeredItems' => $items->count(),
+                ];
+            })->sortBy([['section', 'asc'], ['id', 'asc']])->values()->all();
+    }
+
     // official interpretation for the 1.00-4.00 overall rating scale
-    private function statusFor(float $rating): string
+    public function statusFor(float $rating): string
     {
         return match (true) {
             $rating >= 3.51 => 'Very Satisfactory',
