@@ -44,3 +44,22 @@ test('staff form exposes radio labels and backend failures without showing false
 test('disabled staff cards block mouse and keyboard button activation',()=>{
  let calls=0;const t=Card({title:'Synthetic',disabled:true,disabledLabel:'Evaluations closed',onClick(){calls++;}});const button=nodes(t,n=>n.type==='button')[0];assert.equal(button.props.disabled,true);assert.equal(button.props.onClick,undefined);assert.equal(calls,0);
 });
+
+test('shared Faculty Office and Staff modal limits optional comments to 300 characters',()=>{
+ let saved;
+ const props={show:true,title:'Synthetic Evaluation',categories,onClose(){},onSubmit:data=>saved=data};
+ const h=harness(Form,props);let t=h.render();
+ const textarea=nodes(t,n=>n.type==='textarea')[0];
+ assert.equal(textarea.props.maxLength,300);
+ assert.match(textarea.props['aria-label'],/Optional comments or feedback/i);
+ assert.equal(nodes(t,n=>n.props?.['aria-live']==='polite')[0].props.children,'0 / 300 characters');
+ textarea.props.onChange({target:{value:'a'.repeat(300)}});t=h.render();
+ assert.equal(nodes(t,n=>n.props?.['aria-live']==='polite')[0].props.children,'300 / 300 characters');
+ nodes(t,n=>n.type==='input'&&n.props.type==='radio')[3].props.onChange();
+ t=h.render();nodes(t,n=>n.type==='form')[0].props.onSubmit({preventDefault(){}});
+ assert.equal(saved.comments,'a'.repeat(300));assert.deepEqual(saved.ratings,{11:4});
+ saved=undefined;const blank=harness(Form,props);t=blank.render();
+ nodes(t,n=>n.type==='input'&&n.props.type==='radio')[0].props.onChange();
+ t=blank.render();nodes(t,n=>n.type==='form')[0].props.onSubmit({preventDefault(){}});
+ assert.equal(saved.comments,'');
+});
