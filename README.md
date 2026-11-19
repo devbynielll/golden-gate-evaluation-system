@@ -23,6 +23,8 @@ It also includes all six post-defense stages:
 - **4 — Individual staff evaluations:** optional student submissions, separate progress/results, historical snapshots and authorized Staff reports. Results require at least five distinct students and official period closure; reopening hides them again. Staff feedback is excluded from reports.
 - **5 — Administrator notifications:** a notification bell, read/unread management and authorized report links. Notices describe eligible aggregate Faculty/Office activity after official closure, never individual submission events or Staff activity.
 
+**Additional client revision — optional comments:** Faculty, Office and individual Staff evaluation forms share an optional Comments / Feedback field with a 300-character limit and live counter. Blank feedback does not prevent submission; existing reporting and privacy restrictions are unchanged.
+
 Additional history safeguards prevent supported deletion of evaluated student/faculty records and changes to answered criteria. Access remains role-based: Department Admin retains global academic administration, while Office Admin is restricted to the assigned office. Staff evaluations do not change overall Office scores or required completion.
 
 ## Technology stack
