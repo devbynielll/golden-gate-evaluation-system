@@ -54,6 +54,25 @@ class StaffEvaluationTest extends TestCase
         return app(StaffReportService::class)->rows($this->office->id, $this->period->id, null)->all();
     }
 
+
+    public function test_optional_staff_feedback_enforces_300_characters_and_keeps_reports_private(): void
+    {
+        $ratings = [$this->questions[0]->id => 4, $this->questions[1]->id => 2];
+        $student = $this->student();
+        $this->submit($student, payload: ['ratings' => $ratings, 'comments' => str_repeat('a', 301)])
+            ->assertSessionHasErrors('comments');
+        $this->assertDatabaseCount('staff_evaluations', 0);
+        $this->submit($student, payload: ['ratings' => $ratings, 'comments' => str_repeat('a', 300)])
+            ->assertSessionHasNoErrors();
+        $this->assertSame(str_repeat('a', 300), StaffEvaluation::firstOrFail()->comments);
+        $this->submit(payload: ['ratings' => $ratings])->assertSessionHasNoErrors();
+        $this->assertNull(StaffEvaluation::orderByDesc('id')->firstOrFail()->comments);
+        $this->period->update(['is_submission_open' => false]);
+        $report = json_encode($this->rows());
+        $this->assertStringNotContainsString(str_repeat('a', 300), $report);
+        $this->assertStringNotContainsString('comments', $report);
+    }
+
     public function test_eligible_active_staff_and_optional_progress_are_separate_from_office_totals(): void
     {
         $student = $this->student();
