@@ -65,7 +65,7 @@ class StaffEvaluationTest extends TestCase
         $this->submit($student, payload: ['ratings' => $ratings, 'comments' => str_repeat('a', 300)])
             ->assertSessionHasNoErrors();
         $this->assertSame(str_repeat('a', 300), StaffEvaluation::firstOrFail()->comments);
-        $this->submit(payload: ['ratings' => $ratings])->assertSessionHasNoErrors();
+        $this->submit(payload: ['ratings' => $ratings, 'comments' => ''])->assertSessionHasNoErrors();
         $this->assertNull(StaffEvaluation::orderByDesc('id')->firstOrFail()->comments);
         $this->period->update(['is_submission_open' => false]);
         $report = json_encode($this->rows());

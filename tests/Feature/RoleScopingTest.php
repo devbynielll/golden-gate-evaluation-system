@@ -111,6 +111,20 @@ class RoleScopingTest extends TestCase
     // ---- who can reach what
 
 
+    public function test_empty_comments_are_accepted_for_faculty_and_office_without_changing_ratings(): void
+    {
+        $this->actingAs($this->csStudent->user);
+        foreach (['faculty', 'office'] as $type) {
+            $category = CriteriaCategory::create(['evaluatee_type' => $type, 'section_number' => 1, 'name' => 'Synthetic '.$type]);
+            $question = $category->questions()->create(['text' => 'Synthetic criterion', 'order' => 1]);
+            $target = $type === 'faculty' ? ClassSubject::where('faculty_id', $this->csFaculty->id)->firstOrFail() : $this->globalOffice;
+            $this->post(route('evaluation.'.$type.'.store', $target), ['ratings' => [$question->id => 3], 'comments' => ''])->assertSessionHasNoErrors();
+            $record = Evaluation::where('evaluatee_type', $type)->firstOrFail();
+            $this->assertNull($record->comments);
+            $this->assertSame(3, (int) $record->answers()->firstOrFail()->rating);
+        }
+    }
+
     public function test_optional_faculty_and_office_feedback_has_a_300_character_limit(): void
     {
         $facultyCategory = CriteriaCategory::create(['evaluatee_type' => 'faculty', 'section_number' => 1, 'name' => 'Synthetic Teaching']);

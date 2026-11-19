@@ -291,7 +291,7 @@ export default function EvaluationFormModal({
                                     </div>
                                 </div>
 
-                                {/* Footer */
+                                {/* Footer */}
                                 <div className="flex shrink-0 justify-end gap-3 border-t border-gray-100 px-6 py-4">
                                     <button
                                         type="button"

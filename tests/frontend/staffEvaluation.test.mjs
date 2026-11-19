@@ -51,9 +51,12 @@ test('shared Faculty Office and Staff modal limits optional comments to 300 char
  const h=harness(Form,props);let t=h.render();
  const textarea=nodes(t,n=>n.type==='textarea')[0];
  assert.equal(textarea.props.maxLength,300);
+ const order=nodes(t,n=>n.type==='table'||n.type==='textarea'||(n.type==='button'&&n.props.type==='submit'));
+ assert.equal(order[order.length-2].type,'textarea');assert.equal(order[order.length-1].props.type,'submit');
  assert.match(textarea.props['aria-label'],/Optional comments or feedback/i);
  const countText=tree=>[].concat(nodes(tree,n=>n.props?.['aria-live']==='polite')[0].props.children).join('');
  assert.equal(countText(t),'0 / 300 characters');
+ textarea.props.onChange({target:{value:'Feedback'}});t=h.render();assert.equal(countText(t),'8 / 300 characters');
  textarea.props.onChange({target:{value:'a'.repeat(300)}});t=h.render();
  assert.equal(countText(t),'300 / 300 characters');
  nodes(t,n=>n.type==='input'&&n.props.type==='radio')[3].props.onChange();
