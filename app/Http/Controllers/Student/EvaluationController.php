@@ -106,7 +106,7 @@ class EvaluationController extends Controller
                 $data = $request->validate([
                     'ratings' => ['required', 'array', 'size:'.$questionIds->count()],
                     'ratings.*' => ['required', 'integer', 'min:1', 'max:4'],
-                    'comments' => ['nullable', 'string', 'max:2000'],
+                    'comments' => ['nullable', 'string', 'max:300'],
                 ]);
                 // Compare canonical IDs exactly; e.g. "01" must not alias question 1.
                 $submittedIds = collect(array_keys($data['ratings']))->map(fn ($id) => (string) $id)->sort()->values();
