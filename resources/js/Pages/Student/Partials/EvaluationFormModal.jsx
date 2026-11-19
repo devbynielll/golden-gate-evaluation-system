@@ -12,6 +12,8 @@ import {
 } from '@headlessui/react';
 import { useMemo, useState } from 'react';
 
+const MAX_COMMENT_CHARACTERS = 300;
+
 const RATING_SCALE = [
     { value: 1, label: 'Unsatisfactory', className: 'bg-red-100 text-red-700 border-red-300' },
     { value: 2, label: 'Fairly Satisfactory', className: 'bg-orange-100 text-orange-700 border-orange-300' },
@@ -267,23 +269,29 @@ export default function EvaluationFormModal({
 
                                     <div className="rounded-lg border border-gray-200 p-4">
                                         <p className="text-xs font-bold uppercase tracking-wide text-gray-400">
-                                            Optional Comments
+                                            Optional Comments / Feedback
                                         </p>
                                         <textarea
                                             value={comments}
                                             onChange={(e) =>
                                                 setComments(e.target.value)
                                             }
-                                            aria-label="Optional comments"
-                                            maxLength={2000}
+                                            aria-label="Optional comments or feedback"
+                                            maxLength={MAX_COMMENT_CHARACTERS}
                                             rows={3}
                                             placeholder="Type your feedback here..."
                                             className="mt-2 block w-full resize-none rounded-md border-gray-300 bg-gray-50 text-sm shadow-sm focus:border-green-500 focus:ring-green-500"
                                         />
+                                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+                                            <span>Optional. Avoid including details that could identify you.</span>
+                                            <span aria-live="polite" className="tabular-nums">
+                                                {comments.length} / {MAX_COMMENT_CHARACTERS} characters
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Footer */}
+                                {/* Footer */
                                 <div className="flex shrink-0 justify-end gap-3 border-t border-gray-100 px-6 py-4">
                                     <button
                                         type="button"
