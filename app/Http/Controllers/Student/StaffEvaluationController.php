@@ -40,7 +40,7 @@ class StaffEvaluationController extends Controller
                     ->with('category')->orderBy('criteria_category_id')->orderBy('id')->get();
                 if ($questions->isEmpty()) throw ValidationException::withMessages(['staff' => 'No staff criteria are available for this office yet.']);
                 $data = $request->validate(['ratings' => ['required', 'array', 'size:'.$questions->count()],
-                    'ratings.*' => ['required', 'integer', 'min:1', 'max:4'], 'comments' => ['nullable', 'string', 'max:2000']]);
+                    'ratings.*' => ['required', 'integer', 'min:1', 'max:4'], 'comments' => ['nullable', 'string', 'max:300']]);
                 $keys = collect(array_keys($data['ratings']))->map(fn ($id) => (string) $id)->sort()->values()->all();
                 $expected = $questions->pluck('id')->map(fn ($id) => (string) $id)->sort()->values()->all();
                 if ($keys !== $expected) throw ValidationException::withMessages(['ratings' => 'The staff questionnaire changed or contains invalid questions. Reload the form.']);
