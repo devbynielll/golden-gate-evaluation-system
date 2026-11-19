@@ -110,6 +110,38 @@ class RoleScopingTest extends TestCase
 
     // ---- who can reach what
 
+
+    public function test_optional_faculty_and_office_feedback_has_a_300_character_limit(): void
+    {
+        $facultyCategory = CriteriaCategory::create(['evaluatee_type' => 'faculty', 'section_number' => 1, 'name' => 'Synthetic Teaching']);
+        $facultyQuestion = $facultyCategory->questions()->create(['text' => 'Synthetic teaching criterion', 'order' => 1]);
+        $officeCategory = CriteriaCategory::create(['evaluatee_type' => 'office', 'section_number' => 1, 'name' => 'Synthetic Service']);
+        $officeQuestion = $officeCategory->questions()->create(['text' => 'Synthetic service criterion', 'order' => 1]);
+
+        $offering = ClassSubject::where('faculty_id', $this->csFaculty->id)->firstOrFail();
+        $this->actingAs($this->csStudent->user);
+        $facultyRatings = ['ratings' => [$facultyQuestion->id => 4]];
+        $this->post(route('evaluation.faculty.store', $offering), [...$facultyRatings, 'comments' => str_repeat('f', 301)])
+            ->assertSessionHasErrors('comments');
+        $this->assertDatabaseCount('evaluations', 0);
+        $this->post(route('evaluation.faculty.store', $offering), [...$facultyRatings, 'comments' => str_repeat('f', 300)])
+            ->assertSessionHasNoErrors();
+        $this->assertSame(str_repeat('f', 300), Evaluation::where('evaluatee_type', 'faculty')->firstOrFail()->comments);
+
+        $officeRatings = ['ratings' => [$officeQuestion->id => 3]];
+        $this->post(route('evaluation.office.store', $this->globalOffice), [...$officeRatings, 'comments' => str_repeat('o', 301)])
+            ->assertSessionHasErrors('comments');
+        $this->assertDatabaseCount('evaluations', 1);
+        $this->post(route('evaluation.office.store', $this->globalOffice), [...$officeRatings, 'comments' => str_repeat('o', 300)])
+            ->assertSessionHasNoErrors();
+        $this->assertSame(str_repeat('o', 300), Evaluation::where('evaluatee_type', 'office')->firstOrFail()->comments);
+
+        $this->actingAs($this->eduStudent->user)
+            ->post(route('evaluation.office.store', $this->globalOffice), $officeRatings)
+            ->assertSessionHasNoErrors();
+        $this->assertNull(Evaluation::where('evaluatee_type', 'office')->orderByDesc('id')->firstOrFail()->comments);
+    }
+
     public function test_department_admin_is_blocked_from_super_admin_only_pages(): void
     {
         $this->actingAs($this->deptAdmin);
