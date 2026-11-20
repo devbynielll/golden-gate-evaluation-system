@@ -29,6 +29,14 @@ function ggcClientMetadata(): array
     return $data;
 }
 
+// Laravel does not include drive-letter paths in its default absolute-cache prefixes.
+function ggcClientRegisterCachePrefix(\Illuminate\Foundation\Application $app, string $runtime): void
+{
+    if (preg_match('/\A[A-Za-z]:\//', $runtime)) {
+        $app->addAbsoluteCachePathPrefix(substr($runtime, 0, 3));
+    }
+}
+
 function ggcClientBoot(): \Illuminate\Foundation\Application
 {
     [$root, $runtime] = ggcClientPaths();
@@ -47,6 +55,7 @@ function ggcClientBoot(): \Illuminate\Foundation\Application
         'SESSION_SECURE_COOKIE'=>'false', 'MAIL_MAILER'=>'array', 'LOG_CHANNEL'=>'single', 'FILESYSTEM_DISK'=>'local'];
     foreach ($env as $key=>$value) { putenv($key.'='.$value); $_ENV[$key]=$value; $_SERVER[$key]=$value; }
     $app = require $root.'/bootstrap/app.php';
+    ggcClientRegisterCachePrefix($app, $runtime);
     $app->useEnvironmentPath($runtime);
     $app->useStoragePath($runtime.'/storage');
     $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
