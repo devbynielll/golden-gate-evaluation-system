@@ -72,6 +72,8 @@ export default function Evaluation({
                         title={faculty.cardTitle}
                         subtitle={faculty.subtitle}
                         completed={faculty.completed}
+                        disabled={!isSubmissionOpen}
+                        disabledLabel="Evaluations closed"
                         onClick={() =>
                             setActiveEvaluation({ type: 'faculty', item: faculty })
                         }
@@ -94,6 +96,8 @@ export default function Evaluation({
                         image={officesCardBg}
                         title={office.name}
                         completed={office.completed}
+                        disabled={!isSubmissionOpen}
+                        disabledLabel="Evaluations closed"
                         onClick={() =>
                             setActiveEvaluation({ type: 'office', item: office })
                         }
