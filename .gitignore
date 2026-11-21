@@ -34,3 +34,10 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Disposable client demonstration runtime (never publish data or keys)
+/storage/client-local/
+
+# Local Python developer-check bytecode
+__pycache__/
+*.pyc

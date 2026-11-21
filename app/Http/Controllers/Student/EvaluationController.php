@@ -29,6 +29,7 @@ class EvaluationController extends Controller
         $filters = $request->validate([
             'faculty_page' => ['nullable', 'integer', 'min:1'],
             'office_page' => ['nullable', 'integer', 'min:1'],
+            'staff_page' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $period = $this->service->activePeriod();
@@ -41,6 +42,7 @@ class EvaluationController extends Controller
 
         return Inertia::render('Student/Evaluation', [
             ...$board,
+            ...app(\App\Services\StaffEvaluationService::class)->board($student, $period, $filters['staff_page'] ?? 1),
             'isSubmissionOpen' => $period?->is_submission_open ?? false,
         ]);
     }
@@ -104,7 +106,7 @@ class EvaluationController extends Controller
                 $data = $request->validate([
                     'ratings' => ['required', 'array', 'size:'.$questionIds->count()],
                     'ratings.*' => ['required', 'integer', 'min:1', 'max:4'],
-                    'comments' => ['nullable', 'string', 'max:2000'],
+                    'comments' => ['nullable', 'string', 'max:300'],
                 ]);
                 // Compare canonical IDs exactly; e.g. "01" must not alias question 1.
                 $submittedIds = collect(array_keys($data['ratings']))->map(fn ($id) => (string) $id)->sort()->values();

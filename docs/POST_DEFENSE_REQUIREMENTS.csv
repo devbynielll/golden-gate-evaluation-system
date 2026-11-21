@@ -1,0 +1,27 @@
+Role_or_area,Requirement,Status,Test_evidence_or_gap
+Login,Show/Hide Password; existing authentication and recovery,PASS,phase1A.test.mjs; Phase1ARegressionTest; Auth/*; PasswordResetSecurityTest
+Super Admin,Rolling Academic Year choices retain historical labels,PASS,phase1A.test.mjs; Phase1ARegressionTest
+Super Admin,Review Period edits/extensions; linked identity locked; explicit reopening,PASS,ReviewPeriodEditingTest; StaffEvaluationTest; phase1A.test.mjs
+Super Admin,Distinct Faculty and Office aggregate notifications,PASS,EvaluationNotificationTest; notifications.test.mjs
+Department Admin,Faculty notifications follow global academic administration scope,PASS,EvaluationNotificationTest; RoleScopingTest; DepartmentCriteriaAccessTest
+Office Admin,Assigned-office notifications and read states; forged IDs denied,PASS,EvaluationNotificationTest; notifications.test.mjs
+Super Admin / Office Admin,Office staff creation/editing/archival; no reassignment or destructive deletion,PASS,OfficeStaffManagementTest; staff.test.mjs
+Super Admin / Office Admin,Separate shared/private Staff Criteria; answered history frozen,PASS,StaffCriteriaManagementTest; OfficeStaffMigrationTest; staff.test.mjs
+Super Admin / Department Admin,Faculty summary and individual View/PDF; authorized scope,PASS,ReportImprovementsTest; RoleScopingTest; reports.test.mjs
+Super Admin / Office Admin,Office summary and individual View/PDF; assigned-office scope,PASS,ReportImprovementsTest; OfficeAdminOwnershipTest; reports.test.mjs
+Faculty / Office reports,Actual-answer section ratings; unchanged overall formula; no zero fill,PASS,ReportImprovementsTest; ReportRatingScaleTest; reports.test.mjs
+All authorized report roles,Complete exports beyond pagination; applied filter consistency,PASS,ReportImprovementsTest; StaffReportPrivacyTest; reports.test.mjs
+Student,"Preserved Faculty/Office submissions, eligibility, counts and reminders",PASS,EvaluationWorkflowTest; EvaluationRatingBoundaryTest; OfficeReminderTest; RoleScopingTest
+Student,"Optional eligible Staff evaluation, independent progress and exact 1-4 answers",PASS,StaffEvaluationTest; StaffReportPrivacyTest; staffEvaluation.test.mjs
+Staff history,Separate records; transactional rollback/duplicates; snapshots and restrictive references,PASS,StaffEvaluationTest; OfficeStaffMigrationTest; PostDefenseMigrationIntegrationTest
+Super Admin / Office Admin,Staff View/PDF and section ratings; five distinct students and official closure,PASS,StaffReportPrivacyTest; StaffEvaluationTest; reports.test.mjs
+Staff confidentiality,Reopening hides scores/counts; no feedback/identities/raw submissions; no notification bypass,PASS,StaffReportPrivacyTest; EvaluationNotificationTest; reports.test.mjs
+Notifications,"After-commit dispatch, idempotence/read preservation, scheduled repair, small-group suppression",PASS,EvaluationNotificationTest; real disposable queue evidence in Phase 5 and final preview setup
+Existing client revisions,"Regular/Irregular and unified imports, literal-comma/positional Classes, email recovery and Office dashboard/reminders",PASS,StudentImportTest; IrregularStudentImportTest; UnifiedStudentImportTest; ClassImportTest; StudentEmailIdentityTest; OfficeReminderTest; dashboardRendering.test.mjs; importPolling.test.mjs
+Migrations,Baseline-compatible SQLite additive upgrade; empty reverse rollback; populated guards,PASS,PostDefenseMigrationIntegrationTest: 94 assertions; OfficeStaffMigrationTest; StaffEvaluationTest; EvaluationNotificationTest
+Database engine acceptance,MySQL/MariaDB generated-column/index/FK behavior and parallel-worker concurrency,PARTIAL,SQLite transactions/constraints pass; no isolated MySQL daemon or disposable server available
+Desktop/mobile UI,Integrated layout/navigation/dialog/bell visual and live keyboard acceptance,PARTIAL,31 frontend tests and prior Phase 3/4 screenshots; current browser access disabled; manual checklist required
+Client acceptance,"Accept delayed aggregate notifications, conservative per-section staff suppression and documented baseline risks",NEEDS CLIENT APPROVAL,Policies documented in final report; no immediate-per-submission notification mode added
+Production operations,"Hostinger PHP/database compatibility, backup restore, worker/scheduler/SMTP and live smoke acceptance",PARTIAL,Local platform/build/queue checks pass; production untouched and not certified
+Release history safeguards,Evaluated student/faculty deletion blocked; photos and attribution retained; all roles protect answered Faculty criteria,PASS,HistoricalReleaseGuardTest: 5 tests / 42 assertions; DepartmentCriteriaAccessTest + FacultyQualificationTest + StaffEvaluationTest: 32 tests / 302 assertions
+Release gate closure,"Owner read-only Hostinger diagnostics, manual visual sign-off, backups and target-engine evidence",NEEDS CLIENT APPROVAL,POST_DEFENSE_RELEASE_GATES.md; no production diagnostics or visual/MySQL certification claimed

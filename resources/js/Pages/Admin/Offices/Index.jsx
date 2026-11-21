@@ -9,7 +9,7 @@ import AdminLayout from '@/Layouts/AdminLayout';
 import Pagination from '@/Components/Pagination';
 import ImportModal from '@/Components/ImportModal';
 import OfficeFormModal from '@/Pages/Admin/Offices/Partials/OfficeFormModal';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 
 const OFFICE_IMPORT_FIELDS = [
     { key: 'code', label: 'Office Code', required: true },
@@ -103,6 +103,7 @@ export default function OfficesIndex({ offices, filters = {}, departments = [] }
                 />
             </div>
 
+            {errors.office && <p role="alert" className="mt-3 text-sm text-red-600">{errors.office}</p>}
             <div className="mt-5 min-h-[380px] overflow-hidden rounded-xl bg-white shadow-sm">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
@@ -155,6 +156,7 @@ export default function OfficesIndex({ offices, filters = {}, departments = [] }
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center justify-end gap-2">
+                                                <Link href={route('offices.staff.index', office.id)} className="rounded-md bg-green-100 px-3 py-2 text-xs font-bold text-green-700" aria-label={`Manage staff for ${office.name}`}>Staff</Link>
                                                 <button
                                                     type="button"
                                                     title="Edit Office"

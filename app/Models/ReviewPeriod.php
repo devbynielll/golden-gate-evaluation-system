@@ -36,6 +36,11 @@ class ReviewPeriod extends Model
         return "{$this->academic_year} {$this->semester}";
     }
 
+    public function staffEvaluations(): HasMany
+    {
+        return $this->hasMany(StaffEvaluation::class);
+    }
+
     public function evaluations(): HasMany
     {
         return $this->hasMany(Evaluation::class);

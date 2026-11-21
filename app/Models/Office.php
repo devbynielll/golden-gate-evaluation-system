@@ -18,6 +18,11 @@ class Office extends Model
         return $this->belongsTo(Department::class);
     }
 
+    public function staff(): HasMany
+    {
+        return $this->hasMany(OfficeStaff::class);
+    }
+
     public function evaluations(): HasMany
     {
         return $this->hasMany(Evaluation::class);

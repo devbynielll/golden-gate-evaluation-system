@@ -16,6 +16,8 @@ export default function Evaluation({
     progress = { completed: 0, total: 0 },
     isSubmissionOpen = false,
     warnings = [],
+    officeStaff = EMPTY_PAGE,
+    staffProgress = { completed: 0, total: 0 },
 }) {
     const [activeEvaluation, setActiveEvaluation] = useState(null); // { type, item }
 
@@ -23,18 +25,18 @@ export default function Evaluation({
         router.get(route('evaluation.index'), { [key]: page }, {
             preserveState: true,
             preserveScroll: true,
-            only: ['faculties', 'offices'],
+            only: ['faculties', 'offices', 'officeStaff', 'staffProgress'],
         });
 
     const submit = ({ ratings, comments }, { onSuccess, onError }) => {
         const { type, item } = activeEvaluation;
         const url = type === 'faculty'
             ? route('evaluation.faculty.store', item.id)
-            : route('evaluation.office.store', item.id);
+            : type === 'staff' ? route('evaluation.staff.store', item.id) : route('evaluation.office.store', item.id);
 
         router.post(url, { ratings, comments }, {
             preserveScroll: true,
-            only: ['faculties', 'offices', 'progress', 'errors'],
+            only: ['faculties', 'offices', 'progress', 'officeStaff', 'staffProgress', 'errors', 'flash'],
             onSuccess,
             onError,
         });
@@ -103,6 +105,21 @@ export default function Evaluation({
                 totalPages={offices.meta.last_page}
                 onPageChange={(page) => goToPage('office_page', page)}
             />
+
+            <section className="mt-8" aria-label="Optional individual staff evaluations">
+                <h2 className="text-sm font-extrabold uppercase tracking-wide text-green-700">Individual Office Staff (Optional)</h2>
+                <p className="mt-2 text-sm text-gray-600">These evaluations are separate from overall Office evaluations and do not affect required completion.</p>
+                <p className="mt-1 text-xs text-gray-500">Optional staff evaluations completed: {staffProgress.completed} / {staffProgress.total}</p>
+                <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {officeStaff.data.map((member) => <EvaluationCard key={member.id} image={officesCardBg}
+                        title={member.name} subtitle={member.subtitle} completed={member.completed}
+                        disabled={!isSubmissionOpen || !member.categories.some((category) => category.questions.length > 0)}
+                        disabledLabel={!isSubmissionOpen ? 'Evaluations closed' : 'No staff criteria available'}
+                        onClick={() => setActiveEvaluation({ type: 'staff', item: member })} />)}
+                </div>
+                {!officeStaff.data.length && <p className="mt-3 rounded-xl bg-white p-5 text-sm text-gray-500">No active staff are available for your applicable offices.</p>}
+                <Pagination page={officeStaff.meta.current_page} totalPages={officeStaff.meta.last_page} onPageChange={(page) => goToPage('staff_page', page)} />
+            </section>
 
             {activeEvaluation && (
                 <EvaluationFormModal

@@ -6,10 +6,13 @@ import logo from '@/Assets/logo.png';
 import {
     Dialog,
     DialogPanel,
+    DialogTitle,
     Transition,
     TransitionChild,
 } from '@headlessui/react';
 import { useMemo, useState } from 'react';
+
+const MAX_COMMENT_CHARACTERS = 300;
 
 const RATING_SCALE = [
     { value: 1, label: 'Unsatisfactory', className: 'bg-red-100 text-red-700 border-red-300' },
@@ -31,6 +34,7 @@ export default function EvaluationFormModal({
     const [ratings, setRatings] = useState({});
     const [comments, setComments] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [submissionError, setSubmissionError] = useState('');
 
     const allQuestions = useMemo(
         () => categories.flatMap((category) => category.questions),
@@ -42,6 +46,8 @@ export default function EvaluationFormModal({
         allQuestions.every((question) => ratings[question.id]);
 
     const closeAndReset = () => {
+        if (submitting) return;
+        setSubmissionError('');
         setStep('form');
         setRatings({});
         setComments('');
@@ -52,6 +58,7 @@ export default function EvaluationFormModal({
         e.preventDefault();
         if (!isComplete || submitting) return;
 
+        setSubmissionError('');
         setSubmitting(true);
         submitEvaluation(
             { ratings, comments },
@@ -60,7 +67,7 @@ export default function EvaluationFormModal({
                     setSubmitting(false);
                     setStep('success');
                 },
-                onError: () => setSubmitting(false),
+                onError: (errors) => { setSubmitting(false); setSubmissionError(Object.values(errors ?? {}).flat().join(' ') || 'The evaluation could not be submitted. Please try again.'); },
             },
         );
     };
@@ -102,9 +109,9 @@ export default function EvaluationFormModal({
                                         className="h-10 w-10 shrink-0"
                                     />
                                     <div className="leading-tight">
-                                        <h2 className="text-lg font-extrabold uppercase tracking-wide text-white">
+                                        <DialogTitle className="text-lg font-extrabold uppercase tracking-wide text-white">
                                             {title}
-                                        </h2>
+                                        </DialogTitle>
                                         {subtitle && (
                                             <p className="text-xs font-semibold uppercase tracking-wide text-white/80">
                                                 {subtitle}
@@ -116,6 +123,8 @@ export default function EvaluationFormModal({
                                 <button
                                     type="button"
                                     onClick={closeAndReset}
+                                    disabled={submitting}
+                                    aria-label="Close evaluation form"
                                     className="text-white/80 hover:text-white"
                                 >
                                     <XIcon className="h-5 w-5" />
@@ -128,6 +137,7 @@ export default function EvaluationFormModal({
                                 className="flex flex-1 flex-col overflow-hidden"
                             >
                                 <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
+                                    {submissionError && <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">{submissionError}</p>}
                                     <div className="flex items-start gap-2 rounded-lg border border-gray-200 p-4 text-xs text-gray-600">
                                         <InfoCircleIcon className="h-4 w-4 shrink-0 text-blue-500" />
                                         <p>
@@ -223,6 +233,7 @@ export default function EvaluationFormModal({
                                                                             >
                                                                                 <input
                                                                                     type="radio"
+                                                                                    aria-label={`${question.text}: ${scale.value} — ${scale.label}`}
                                                                                     name={`question-${question.id}`}
                                                                                     checked={
                                                                                         ratings[
@@ -258,17 +269,25 @@ export default function EvaluationFormModal({
 
                                     <div className="rounded-lg border border-gray-200 p-4">
                                         <p className="text-xs font-bold uppercase tracking-wide text-gray-400">
-                                            Optional Comments
+                                            Optional Comments / Feedback
                                         </p>
                                         <textarea
                                             value={comments}
                                             onChange={(e) =>
                                                 setComments(e.target.value)
                                             }
+                                            aria-label="Optional comments or feedback"
+                                            maxLength={MAX_COMMENT_CHARACTERS}
                                             rows={3}
                                             placeholder="Type your feedback here..."
                                             className="mt-2 block w-full resize-none rounded-md border-gray-300 bg-gray-50 text-sm shadow-sm focus:border-green-500 focus:ring-green-500"
                                         />
+                                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+                                            <span>Optional. Avoid including details that could identify you.</span>
+                                            <span aria-live="polite" className="tabular-nums">
+                                                {comments.length} / {MAX_COMMENT_CHARACTERS} characters
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -307,9 +326,9 @@ export default function EvaluationFormModal({
                             <div className="px-8 py-8 text-center">
                                 <CheckCircleIcon className="mx-auto h-14 w-14 text-green-500" />
 
-                                <h2 className="mt-4 text-xl font-extrabold text-gray-900">
+                                <DialogTitle className="mt-4 text-xl font-extrabold text-gray-900">
                                     Thank You!
-                                </h2>
+                                </DialogTitle>
                                 <p className="mt-1 text-sm text-gray-500">
                                     Your evaluation was submitted
                                     successfully.
