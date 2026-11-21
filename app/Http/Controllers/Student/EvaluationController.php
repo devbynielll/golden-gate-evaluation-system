@@ -14,6 +14,7 @@ use App\Services\StudentEvaluationService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -80,7 +81,7 @@ class EvaluationController extends Controller
         $period = $this->service->activePeriod();
 
         if (! $period || ! $period->is_submission_open) {
-            return back()->with('status', 'Evaluations are closed right now.');
+            throw ValidationException::withMessages(['evaluation' => 'Evaluations are closed right now.']);
         }
 
         $alreadySubmitted = Evaluation::where('student_id', $student->id)
@@ -91,7 +92,7 @@ class EvaluationController extends Controller
             ->exists();
 
         if ($alreadySubmitted) {
-            return back()->with('status', 'You already submitted this evaluation.');
+            throw ValidationException::withMessages(['evaluation' => 'You already submitted this evaluation.']);
         }
 
         try {
@@ -100,7 +101,9 @@ class EvaluationController extends Controller
                 // changes take an exclusive lock on these same rows.
                 ReviewPeriod::orderBy('id')->sharedLock()->get();
                 $current = $this->service->activePeriod();
-                abort_unless($current && $current->id === $period->id && $current->is_submission_open, 422);
+                if (! $current || $current->id !== $period->id || ! $current->is_submission_open) {
+                    throw ValidationException::withMessages(['evaluation' => 'This evaluation period changed or closed. Reload the evaluation page.']);
+                }
                 $student = Student::whereKey($student->id)->lockForUpdate()->firstOrFail();
                 $questionIds = CriteriaQuestion::whereHas('category', fn ($q) => $q->forQuestionnaire($type, $target['office_id'] ?? null))->pluck('id');
                 $data = $request->validate([
@@ -136,7 +139,7 @@ class EvaluationController extends Controller
             }, 3);
         } catch (UniqueConstraintViolationException) {
             // double submit
-            return back()->with('status', 'You already submitted this evaluation.');
+            throw ValidationException::withMessages(['evaluation' => 'You already submitted this evaluation.']);
         }
 
         $this->service->forget();
