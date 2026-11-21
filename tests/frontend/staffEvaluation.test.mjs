@@ -67,3 +67,27 @@ test('shared Faculty Office and Staff modal limits optional comments to 300 char
  t=blank.render();nodes(t,n=>n.type==='form')[0].props.onSubmit({preventDefault(){}});
  assert.equal(saved.comments,'');
 });
+
+test('Faculty Office and Staff cards close together, retain Completed labels and reopen normally',()=>{
+ globalThis.studentCalls=[];
+ const page={data:[{id:1,name:'Synthetic target',cardTitle:'Synthetic Faculty',categories,completed:false}],meta:{current_page:1,last_page:2}};
+ const props={faculties:page,offices:page,officeStaff:page,isSubmissionOpen:false};
+ const h=harness(Page,props);let t=h.render();let cards=nodes(t,n=>n.type===Card);assert.equal(cards.length,3);
+ for(const card of cards){assert.equal(card.props.disabled,true);assert.match(card.props.disabledLabel,/evaluations closed/i);const native=Card(card.props);assert.equal(native.props.disabled,true);assert.equal(native.props.onClick,undefined);}
+ props.isSubmissionOpen=true;t=h.render();cards=nodes(t,n=>n.type===Card);for(const card of cards)assert.equal(card.props.disabled,false);
+ cards[0].props.onClick();props.isSubmissionOpen=false;t=h.render();const modal=nodes(t,n=>n.type===Form)[0];assert.equal(modal.props.isSubmissionOpen,false);
+ let success=false,error;modal.props.onSubmit({ratings:{11:4},comments:''},{onSuccess(){success=true;},onError(e){error=e;}});
+ assert.equal(success,false);assert.match(error.evaluation,/closed/i);assert.equal(studentCalls.length,0);
+ for(const card of nodes(t,n=>n.type===Card)){const completed=Card({...card.props,completed:true});assert.equal(completed.props.onClick,undefined);assert.match(nodes(completed,n=>n.type==='span').map(n=>[].concat(n.props.children).filter(c=>typeof c==='string').join('')).join(' '),/Completed/);}
+ const pagination=nodes(t,n=>n.props?.totalPages===2)[0];pagination.props.onPageChange(2);assert.ok(studentCalls[0][2].only.includes('isSubmissionOpen'));
+ props.isSubmissionOpen=true;t=h.render();const reopened=nodes(t,n=>n.type===Form)[0];reopened.props.onSubmit({ratings:{11:4},comments:''},{onSuccess(){},onError(){}});assert.ok(studentCalls[1][2].only.includes('isSubmissionOpen'));
+});
+
+test('a stale open form becomes disabled and cannot show success after closure',()=>{
+ let submits=0;const props={show:true,title:'Synthetic Faculty',categories,isSubmissionOpen:true,onClose(){},onSubmit(){submits++;}};
+ const h=harness(Form,props);let t=h.render();nodes(t,n=>n.type==='input'&&n.props.type==='radio')[3].props.onChange();
+ props.isSubmissionOpen=false;t=h.render();assert.ok(nodes(t,n=>n.props?.role==='alert').length);
+ assert.ok(nodes(t,n=>n.type==='input'&&n.props.type==='radio').every(n=>n.props.disabled));assert.equal(nodes(t,n=>n.type==='textarea')[0].props.disabled,true);
+ assert.equal(nodes(t,n=>n.type==='button'&&n.props.type==='submit')[0].props.disabled,true);
+ nodes(t,n=>n.type==='form')[0].props.onSubmit({preventDefault(){}});t=h.render();assert.equal(submits,0);assert.equal(nodes(t,n=>n.props?.children==='Thank You!').length,0);
+});

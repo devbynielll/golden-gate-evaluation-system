@@ -40,3 +40,12 @@ test('revalidation removes reopened or revoked groups and ignores late responses
  noticeGet=async()=>({data:{unread:0,items:[],page:1,lastPage:1}});await noticeTimer();assert.equal(nodes(h.render(),n=>n.type==='li').length,0);
  let resolve;noticeGet=()=>new Promise(r=>resolve=r);const pending=noticeTimer();h.cleanup();resolve({data:{unread:1,items:[item],page:1,lastPage:1}});await pending;assert.equal(nodes(h.render(),n=>n.type==='li').length,0);
 });
+
+test('notification guidance explains approved delayed release without suggesting a per-student alert',async()=>{
+ setup();noticeGet=async()=>({data:{unread:0,items:[],page:1,lastPage:1}});const h=harness();h.render();await tick();const t=h.render();
+ const paragraphs=nodes(t,n=>n.type==='p'&&typeof n.props?.children==='string').map(n=>n.props.children).join(' ');
+ assert.match(paragraphs,/delayed aggregate notices, not instant alerts/);
+ assert.match(paragraphs,/official review period closure and at least five distinct students/);
+ assert.match(paragraphs,/Open periods and groups below five distinct students are not listed/);
+ assert.match(paragraphs,/No submission times or student details/);h.cleanup();
+});

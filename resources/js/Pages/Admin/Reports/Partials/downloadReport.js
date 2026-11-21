@@ -27,14 +27,22 @@ export async function createReportDocument({ subject, reviewPeriod, filterLabel,
     doc.setLineWidth(1);
     doc.line(15, 40, 196, 40);
     let y = 50;
-    const text = (value, bold = false) => {
+    const text = (value, bold = false, centered = false) => {
         doc.setFontSize(10);
         doc.setFont('helvetica', bold ? 'bold' : 'normal');
         doc.setTextColor(...DARK);
         const lines = doc.splitTextToSize(String(value), 181);
-        if (y + lines.length * 5 > 260) { doc.addPage(); y = 20; }
-        doc.text(lines, 15, y);
-        y += lines.length * 5 + 3;
+        // Paginate long identity/filter blocks without truncating or overflowing a page.
+        while (lines.length) {
+            if (y > 260) { doc.addPage(); y = 20; }
+            const capacity = Math.max(1, Math.floor((260 - y) / 5) + 1);
+            const pageLines = lines.splice(0, capacity);
+            doc.text(pageLines, centered ? doc.internal.pageSize.getWidth() / 2 : 15, y,
+                { align: centered ? 'center' : 'left' });
+            y += pageLines.length * 5;
+            if (lines.length) { doc.addPage(); y = 20; }
+        }
+        y += 3;
     };
     const table = (head, body) => {
         if (y > 245) { doc.addPage(); y = 20; }
@@ -46,14 +54,14 @@ export async function createReportDocument({ subject, reviewPeriod, filterLabel,
         });
         y = doc.lastAutoTable.finalY + 8;
     };
-    text(reviewPeriod, true);
-    if (filterLabel) text(filterLabel);
+    text(reviewPeriod, true, true);
+    if (filterLabel) text(filterLabel, false, true);
     if (detail) {
-        text(`${subject} Name: ${detail.name}`, true);
+        text(`${subject} Name: ${detail.name}`, true, true);
         text(subject === 'Staff'
             ? `Evaluated position: ${detail.position} | Office: ${detail.officeCode} - ${detail.officeName}` : subject === 'Faculty'
             ? `Faculty ID: ${detail.facultyId} | Department: ${detail.department ?? '—'}`
-            : `Office Code: ${detail.officeCode ?? '—'}`);
+            : `Office Code: ${detail.officeCode ?? '—'}`, false, true);
         text(`Overall Rating: ${ratingLabel(detail)}${detail.rating !== null && detail.status !== 'No Data' ? ' / 4.00' : ''}`, true);
         text(`Performance Status: ${detail.status}`);
         text(`Responses: ${detail.responses === null ? 'Withheld' : detail.responses}`);

@@ -25,10 +25,14 @@ export default function Evaluation({
         router.get(route('evaluation.index'), { [key]: page }, {
             preserveState: true,
             preserveScroll: true,
-            only: ['faculties', 'offices', 'officeStaff', 'staffProgress'],
+            only: ['faculties', 'offices', 'officeStaff', 'staffProgress', 'isSubmissionOpen'],
         });
 
     const submit = ({ ratings, comments }, { onSuccess, onError }) => {
+        if (!isSubmissionOpen) {
+            onError?.({ evaluation: 'Evaluations are currently closed. Reload the evaluation page.' });
+            return;
+        }
         const { type, item } = activeEvaluation;
         const url = type === 'faculty'
             ? route('evaluation.faculty.store', item.id)
@@ -36,7 +40,7 @@ export default function Evaluation({
 
         router.post(url, { ratings, comments }, {
             preserveScroll: true,
-            only: ['faculties', 'offices', 'progress', 'officeStaff', 'staffProgress', 'errors', 'flash'],
+            only: ['faculties', 'offices', 'progress', 'officeStaff', 'staffProgress', 'isSubmissionOpen', 'errors', 'flash'],
             onSuccess,
             onError,
         });
@@ -132,6 +136,7 @@ export default function Evaluation({
                     title={activeEvaluation.item.cardTitle ?? activeEvaluation.item.name}
                     subtitle={activeEvaluation.item.subtitle}
                     categories={activeEvaluation.item.categories}
+                    isSubmissionOpen={isSubmissionOpen}
                     onSubmit={submit}
                 />
             )}

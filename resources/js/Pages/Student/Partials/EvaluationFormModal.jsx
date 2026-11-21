@@ -29,6 +29,7 @@ export default function EvaluationFormModal({
     subtitle,
     categories = [],
     onSubmit: submitEvaluation,
+    isSubmissionOpen = true,
 }) {
     const [step, setStep] = useState('form'); // 'form' | 'success'
     const [ratings, setRatings] = useState({});
@@ -56,6 +57,10 @@ export default function EvaluationFormModal({
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        if (!isSubmissionOpen) {
+            setSubmissionError('Evaluations are currently closed. Reload the evaluation page.');
+            return;
+        }
         if (!isComplete || submitting) return;
 
         setSubmissionError('');
@@ -137,6 +142,7 @@ export default function EvaluationFormModal({
                                 className="flex flex-1 flex-col overflow-hidden"
                             >
                                 <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
+                                    {!isSubmissionOpen && <p role="alert" className="rounded-md bg-yellow-50 p-3 text-sm text-yellow-800">Evaluations are currently closed. This form cannot be submitted.</p>}
                                     {submissionError && <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">{submissionError}</p>}
                                     <div className="flex items-start gap-2 rounded-lg border border-gray-200 p-4 text-xs text-gray-600">
                                         <InfoCircleIcon className="h-4 w-4 shrink-0 text-blue-500" />
@@ -233,6 +239,7 @@ export default function EvaluationFormModal({
                                                                             >
                                                                                 <input
                                                                                     type="radio"
+                                                                                    disabled={!isSubmissionOpen || submitting}
                                                                                     aria-label={`${question.text}: ${scale.value} — ${scale.label}`}
                                                                                     name={`question-${question.id}`}
                                                                                     checked={
@@ -272,6 +279,7 @@ export default function EvaluationFormModal({
                                             Optional Comments / Feedback
                                         </p>
                                         <textarea
+                                            disabled={!isSubmissionOpen || submitting}
                                             value={comments}
                                             onChange={(e) =>
                                                 setComments(e.target.value)
@@ -302,7 +310,7 @@ export default function EvaluationFormModal({
                                     </button>
                                     <button
                                         type="submit"
-                                        disabled={!isComplete || submitting}
+                                        disabled={!isComplete || submitting || !isSubmissionOpen}
                                         className="rounded-md bg-green-600 px-6 py-2 text-sm font-bold uppercase tracking-wide text-white shadow-sm transition hover:bg-green-500 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
                                     >
                                         Submit

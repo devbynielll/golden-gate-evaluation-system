@@ -80,12 +80,12 @@ export default function EvaluationNotifications() {
                     <DialogTitle className="text-lg font-bold text-gray-900">Evaluation Notifications</DialogTitle>
                     <button type="button" aria-label="Close notifications" onClick={() => setShow(false)} className="rounded px-2 text-gray-600 focus-visible:outline focus-visible:outline-green-600">✕</button>
                 </div>
-                <p className="mt-2 text-xs text-gray-600">Aggregated Faculty and Office activity is released only after official review period closure and at least five distinct students in the notification group. Staff evaluations are separate. No submission times or student details are shown.</p>
+                <p className="mt-2 text-xs text-gray-600">These are delayed aggregate notices, not instant alerts for each submission. Faculty and Office activity is released only after official review period closure and at least five distinct students in the notification group. Staff evaluations are separate. No submission times or student details are shown.</p>
                 {loading && <p role="status" className="mt-4 text-sm text-gray-600">Loading notifications…</p>}
                 {error && <p role="alert" className="mt-4 text-sm text-red-700">{error}</p>}
                 {!loading && !error && <>
                     <p className="mt-4 text-xs font-semibold text-green-800">{inbox.unread} unread notification groups</p>
-                    {!inbox.items.length && <p role="status" className="mt-4 text-sm text-gray-600">No released notifications are available.</p>}
+                    {!inbox.items.length && <><p role="status" className="mt-4 text-sm text-gray-600">No released notifications are available.</p><p className="mt-2 text-xs text-gray-500">Open periods and groups below five distinct students are not listed.</p></>}
                     <ul className="mt-3 space-y-3">{inbox.items.map(item => <li key={item.id} className={`rounded-lg border p-4 ${item.read ? 'border-gray-200' : 'border-green-300 bg-green-50'}`}>
                         <h3 className="text-sm font-bold text-gray-900">{item.title} <span className="text-xs font-normal">({item.read ? 'Read' : 'Unread'})</span></h3>
                         <p className="mt-1 break-words text-sm text-gray-700">{item.subject}</p>

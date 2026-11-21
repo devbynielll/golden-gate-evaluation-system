@@ -19,7 +19,7 @@ const output=await build({stdin:{resolveDir:app,contents:`export {default as use
  axios:'export default {get:(...a)=>globalThis.reportGet(...a)};',
  download:'export default async (...a)=>globalThis.reportDownload(...a);',
  logo:'export const loadReportLogo=async()=>"synthetic";',
- pdf:`import{jsPDF as Native}from'${app}/node_modules/jspdf/dist/jspdf.node.min.js';export class jsPDF extends Native{constructor(...args){super(...args);this.addImage=()=>this;}}`,
+ pdf:`import{jsPDF as Native}from'${app}/node_modules/jspdf/dist/jspdf.node.min.js';export class jsPDF extends Native{constructor(...args){super(...args);this.addImage=()=>this;this.textLayout=[];const original=this.text;this.text=(...a)=>{this.textLayout.push({text:Array.isArray(a[0])?[...a[0]]:a[0],x:a[1],y:a[2],align:a[3]?.align??'left',page:this.internal.getCurrentPageInfo().pageNumber});return original.apply(this,a);};}}`,
  modal:'import React from "react";export default function Modal({show,children}){return show?React.createElement("section",{},children):null;}',
  title:'import React from "react";export const DialogTitle=({children,...props})=>React.createElement("h2",props,children);',
  inertia:'export const router={get:(...args)=>globalThis.reportVisits.push(args)};',
@@ -105,4 +105,30 @@ test('staff downloads recheck the live release state instead of exporting a stal
  const downloads=[];globalThis.reportDownload=async data=>downloads.push(data);
  let control=h.render();await control.open('a'.repeat(64));control=h.render();assert.equal(control.report,released);
  await control.downloadCurrent();assert.equal(calls,2);assert.equal(downloads[0],hidden);
+});
+
+test('all six PDF modes center only the applied period/filter and identity information',async()=>{
+ for(const subject of ['Faculty','Office','Staff'])for(const individual of [false,true]){
+  const row={...detail,name:`Synthetic ${subject}`,officeCode:'REG',officeName:'Synthetic Registrar',position:'Records Assistant',reviewPeriod:report.reviewPeriod,responses:5};
+  const data={subject,reviewPeriod:report.reviewPeriod,filterLabel:'Applied Department / Office: Synthetic',...(individual?{detail:row}:{summaryRows:[row]})};
+  const doc=await createReportDocument(data);const center=doc.internal.pageSize.getWidth()/2;
+  const find=value=>doc.textLayout.find(entry=>[].concat(entry.text).join(' ').includes(value));
+  for(const value of [data.reviewPeriod,data.filterLabel,...(individual?[`${subject} Name:`,subject==='Faculty'?'Faculty ID:':subject==='Office'?'Office Code:':'Evaluated position:']:[])]){
+   const entry=find(value);assert.ok(entry,value);assert.equal(entry.align,'center');assert.ok(Math.abs(entry.x-center)<0.001);
+  }
+  assert.equal(find('Evaluation '+(individual?'Individual':'Performance Summary')+' Report').align,'left');
+  if(individual){assert.equal(find('Overall Rating:').align,'left');assert.equal(find('Responses:').align,'left');}
+  const label=individual?'Criteria Section':subject==='Faculty'?'Faculty Name':subject==='Office'?'Office Name':'Staff Name';
+  assert.equal(find(label).align,'left');
+ }
+});
+
+test('long PDF identity blocks wrap and paginate inside printable margins without losing content',async()=>{
+ const name=Array.from({length:90},(_,i)=>`Historical staff name ${i+1} with a sufficiently long descriptive label`).join(' / ');
+ const data={subject:'Staff',reviewPeriod:report.reviewPeriod,filterLabel:'Office: Synthetic Registrar',detail:{...detail,name,position:'Records Assistant',officeCode:'REG',officeName:'Synthetic Registrar',responses:5,feedback:undefined}};
+ const doc=await createReportDocument(data);assert.ok(doc.getNumberOfPages()>1);
+ const info=doc.textLayout.filter(entry=>entry.align==='center');assert.ok(info.some(entry=>Array.isArray(entry.text)&&entry.text.length>1));
+ for(const entry of info){assert.ok(entry.y>=20);for(const [index,line]of[].concat(entry.text).entries()){assert.ok(entry.y+index*5<=260);assert.ok(doc.getTextWidth(line)<=181.1);}}
+ assert.ok(info.flatMap(entry=>[].concat(entry.text)).join(' ').includes('Historical staff name 90'));
+ assert.ok(doc.output().includes('3.33'));assert.ok(!doc.output().includes('Student Feedback'));
 });
